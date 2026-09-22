@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TrainerLogMatch, BattleTurnAction } from '../../types';
 import PokemonCard from '../PokemonCard';
 import { convertLocalIdToPTCGL, getRegisteredCollectionCardsCount } from '../../utils/cardImages';
+import ReplayActionHistory from './ReplayActionHistory';
 import { 
   Play, 
   Pause, 
@@ -35,6 +36,13 @@ export default function BoardReplay({ match }: BoardReplayProps) {
   const turns = match.turns || [];
   const currentTurn = turns[currentTurnIdx] || turns[0];
   const linkedCardsCount = getRegisteredCollectionCardsCount();
+
+  // Match ending & Winner determination
+  const isMatchFinished = Boolean(currentTurn?.isGameOver || currentTurnIdx === turns.length - 1);
+  const matchWinner: 'player1' | 'player2' = currentTurn?.winner || (match.result === 'win' ? 'player1' : 'player2');
+  const winnerName = matchWinner === 'player1' ? match.player1Name : match.player2Name;
+  const isPlayer1Winner = isMatchFinished && matchWinner === 'player1';
+  const isPlayer2Winner = isMatchFinished && matchWinner === 'player2';
 
   // Auto playback loop
   useEffect(() => {
@@ -351,46 +359,45 @@ export default function BoardReplay({ match }: BoardReplayProps) {
         </div>
       </div>
 
-      {/* Battle Mat / Virtual Pokémon Board */}
-      <div className="bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 relative overflow-hidden shadow-2xl">
-        {/* Subtle grid pattern background */}
-        <div className="absolute inset-0 bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:24px_24px] opacity-10 pointer-events-none" />
+      {/* Responsive Grid: Field on the Left, Actions History on the Right (Mobile: History underneath) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* COLUNA ESQUERDA: CAMPO DE BATALHA POKÉMON */}
+        <div className="lg:col-span-7 xl:col-span-8 space-y-4">
+          <div className="bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-4 sm:p-6 relative overflow-hidden shadow-2xl">
+            {/* Subtle grid pattern background */}
+            <div className="absolute inset-0 bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:24px_24px] opacity-10 pointer-events-none" />
 
-        {/* GAME OVER BANNER WHEN TURN IS GAME OVER */}
-        {currentTurn.isGameOver && (
-          <div className="relative mb-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-950/80 via-purple-950/80 to-slate-950 border border-emerald-500/50 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shadow-lg">
-                <Trophy className="w-6 h-6 text-amber-400 animate-bounce" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-base font-extrabold text-white">
-                    Fim de Jogo: {currentTurn.winner === 'player1' ? `Vitória de ${match.player1Name}` : `Vitória de ${match.player2Name}`}!
-                  </span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                    currentTurn.winner === 'player1' 
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                      : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                  }`}>
-                    {currentTurn.winner === 'player1' ? 'VITÓRIA' : 'DERROTA'}
-                  </span>
+            {/* GAME OVER BANNER WHEN TURN IS GAME OVER OR FINAL */}
+            {isMatchFinished && (
+              <div className="relative mb-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-950/80 via-purple-950/80 to-slate-950 border border-emerald-500/50 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-lg">
+                    <Trophy className="w-6 h-6 text-amber-400 animate-bounce" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-base font-black text-white">
+                        Fim de Jogo: {isPlayer1Winner ? match.player1Name : match.player2Name}
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 border border-yellow-200 shadow-md shadow-amber-500/30 flex items-center gap-1 animate-pulse">
+                        <Trophy className="w-3.5 h-3.5 fill-slate-950" /> (Vencedor)
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5 font-medium">
+                      {currentTurn.gameEndReason || (isPlayer1Winner 
+                        ? `${match.player2Name} não tem mais Pokémon em jogo.` 
+                        : `${match.player1Name} não tem mais Pokémon em jogo.`)}
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-300 mt-0.5 font-medium">
-                  {currentTurn.gameEndReason || (currentTurn.winner === 'player1' 
-                    ? `${match.player2Name} não tem mais Pokémon em jogo.` 
-                    : `${match.player1Name} não tem mais Pokémon em jogo.`)}
-                </p>
+                <div className="text-right shrink-0 bg-slate-950/80 px-4 py-2 rounded-xl border border-slate-800">
+                  <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Prêmios Finais</div>
+                  <div className="text-base font-black font-mono text-amber-400">
+                    {match.p1PrizesTaken} - {match.p2PrizesTaken}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="text-right shrink-0 bg-slate-950/80 px-4 py-2 rounded-xl border border-slate-800">
-              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Prêmios Finais</div>
-              <div className="text-base font-black font-mono text-amber-400">
-                {match.p1PrizesTaken} - {match.p2PrizesTaken}
-              </div>
-            </div>
-          </div>
-        )}
+            )}
 
         {/* EVOLUTION EVENT HIGHLIGHT BANNER */}
         {((currentTurn.evolutions && currentTurn.evolutions.length > 0) || isP1ActiveEvolved || isP2ActiveEvolved) && (
@@ -438,11 +445,21 @@ export default function BoardReplay({ match }: BoardReplayProps) {
                 <User className="w-5 h-5" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-bold text-white">{match.player2Name}</span>
                   <span className="px-2.5 py-0.5 bg-rose-500/20 text-rose-300 text-[10px] font-extrabold rounded-full border border-rose-500/30">
                     {match.opponentDeckArchetype}
                   </span>
+                  {isPlayer2Winner && (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 border border-yellow-200 shadow-md shadow-amber-500/30 flex items-center gap-1 animate-pulse">
+                      <Trophy className="w-3 h-3 fill-slate-950" /> (Vencedor)
+                    </span>
+                  )}
+                  {isPlayer1Winner && (
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-slate-800 text-slate-400 border border-slate-700">
+                      (Derrotado)
+                    </span>
+                  )}
                 </div>
                 <span className="text-xs text-slate-400">Oponente</span>
               </div>
@@ -479,6 +496,13 @@ export default function BoardReplay({ match }: BoardReplayProps) {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
             {/* Opponent Active Pokemon (Featured Card Display) */}
             <div className="md:col-span-4 bg-gradient-to-br from-rose-950/50 to-slate-950 p-4 rounded-2xl border border-rose-500/40 text-center shadow-xl relative flex flex-col items-center min-h-[180px] justify-center">
+              {isPlayer2Winner && (
+                <div className="w-full flex items-center justify-center mb-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 text-slate-950 border border-yellow-200 shadow-md shadow-amber-500/40 flex items-center gap-1 animate-bounce">
+                    <Trophy className="w-3 h-3 fill-slate-950" /> (Vencedor)
+                  </span>
+                </div>
+              )}
               <div className="w-full flex items-center justify-between mb-2">
                 <span className="text-[10px] uppercase font-bold text-rose-400 tracking-wider">Campo Ativo</span>
                 {currentTurn.turnNumber === 0 ? (
@@ -634,6 +658,13 @@ export default function BoardReplay({ match }: BoardReplayProps) {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
             {/* Player Active Pokemon (Featured Card Display) */}
             <div className="md:col-span-4 bg-gradient-to-br from-purple-950/50 to-slate-950 p-4 rounded-2xl border border-purple-500/40 text-center shadow-xl relative flex flex-col items-center min-h-[180px] justify-center">
+              {isPlayer1Winner && (
+                <div className="w-full flex items-center justify-center mb-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 text-slate-950 border border-yellow-200 shadow-md shadow-amber-500/40 flex items-center gap-1 animate-bounce">
+                    <Trophy className="w-3.5 h-3.5 fill-slate-950" /> (Vencedor)
+                  </span>
+                </div>
+              )}
               <div className="w-full flex items-center justify-between mb-2">
                 <span className="text-[10px] uppercase font-bold text-purple-400 tracking-wider">Seu Campo Ativo</span>
                 {currentTurn.turnNumber === 0 ? (
@@ -757,11 +788,21 @@ export default function BoardReplay({ match }: BoardReplayProps) {
                 <User className="w-5 h-5" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-bold text-white">{match.player1Name}</span>
                   <span className="px-2.5 py-0.5 bg-purple-500/20 text-purple-300 text-[10px] font-extrabold rounded-full border border-purple-500/30">
                     {match.playerDeckArchetype}
                   </span>
+                  {isPlayer1Winner && (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 border border-yellow-200 shadow-md shadow-amber-500/30 flex items-center gap-1 animate-pulse">
+                      <Trophy className="w-3 h-3 fill-slate-950" /> (Vencedor)
+                    </span>
+                  )}
+                  {isPlayer2Winner && (
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-slate-800 text-slate-400 border border-slate-700">
+                      (Derrotado)
+                    </span>
+                  )}
                 </div>
                 <span className="text-xs text-slate-400">Você</span>
               </div>
@@ -795,100 +836,23 @@ export default function BoardReplay({ match }: BoardReplayProps) {
           </div>
         </div>
       </div>
-
-      {/* Action Breakdown of the Current Turn with Card Thumbnails */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-purple-400" />
-            <span className="text-sm font-bold text-white uppercase tracking-wider">Linha do Tempo de Ações - Turno {currentTurn.turnNumber}</span>
-            <span className="text-xs text-slate-400">({filteredActions.length} ações)</span>
-          </div>
-
-          {/* Action category filter tabs */}
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
-            <button
-              onClick={() => setActionFilter('all')}
-              className={`px-2 py-1 rounded font-bold ${actionFilter === 'all' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              Todas
-            </button>
-            <button
-              onClick={() => setActionFilter('attacks')}
-              className={`px-2 py-1 rounded font-bold ${actionFilter === 'attacks' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              Ataques/KOs
-            </button>
-            <button
-              onClick={() => setActionFilter('trainers')}
-              className={`px-2 py-1 rounded font-bold ${actionFilter === 'trainers' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              Treinadores
-            </button>
-            <button
-              onClick={() => setActionFilter('abilities')}
-              className={`px-2 py-1 rounded font-bold ${actionFilter === 'abilities' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              Habilidades
-            </button>
-            <button
-              onClick={() => setActionFilter('prizes')}
-              className={`px-2 py-1 rounded font-bold ${actionFilter === 'prizes' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              Prêmios
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1 scrollbar-thin">
-          {filteredActions.length === 0 ? (
-            <div className="py-8 text-center text-xs text-slate-500 italic">
-              Nenhuma ação deste tipo registrada neste turno.
-            </div>
-          ) : (
-            filteredActions.map((action, idx) => {
-              const cardNameForPreview = action.cardName || action.description;
-              return (
-                <div
-                  key={action.id || idx}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-850 hover:border-slate-700 transition-colors"
-                >
-                  {/* Card Image Thumbnail */}
-                  <div className="shrink-0">
-                    <PokemonCard
-                      name={cardNameForPreview}
-                      size="xs"
-                      showInspectButton={true}
-                    />
-                  </div>
-
-                  <div className="pt-0.5 shrink-0">
-                    {getActionBadge(action)}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs text-slate-200 break-words font-medium">
-                      {action.description}
-                    </div>
-                    {action.cardName && (
-                      <div className="card-data-field mt-1 flex items-center gap-1.5 text-[10px] text-slate-400">
-                        <span className="font-semibold text-slate-300 truncate max-w-[140px]">{action.cardName}</span>
-                        <span className="font-mono text-purple-300 font-bold bg-purple-950/70 px-1.5 py-0.5 rounded border border-purple-500/30 text-[9px] shrink-0">
-                          {convertLocalIdToPTCGL(action.cardName).canonicalCode}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <span className="text-[10px] text-slate-500 font-mono shrink-0">
-                    #{idx + 1}
-                  </span>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
     </div>
+
+    {/* COLUNA DIREITA: HISTÓRICO DE AÇÕES DENTRO DA PARTIDA (NO MOBILE FICA EMBAIXO) */}
+    <div className="lg:col-span-5 xl:col-span-4 space-y-4 lg:sticky lg:top-4">
+      <ReplayActionHistory
+        turns={turns}
+        currentTurnIdx={currentTurnIdx}
+        onSelectTurn={setCurrentTurnIdx}
+        actionFilter={actionFilter}
+        setActionFilter={setActionFilter}
+        isMatchFinished={isMatchFinished}
+        matchWinner={matchWinner}
+        winnerName={winnerName}
+        match={match}
+      />
+    </div>
+  </div>
+</div>
   );
 }
