@@ -28,6 +28,7 @@ import {
   isSetStandardLegal,
   getSetRegulationMark,
 } from './setSync';
+import { sanitizePokemonCreatureName } from './pokemonSprites';
 
 export const POKEMON_CARD_BACK = 'https://images.pokemontcg.io/card-back.png';
 export const POKEMON_CARD_BACK_FALLBACK = 'https://archives.bulbagarden.net/media/upload/1/17/Cardback.jpg';
@@ -36,6 +37,9 @@ export const POKEMON_CARD_BACK_FALLBACK = 'https://archives.bulbagarden.net/medi
 // OVERRIDE DE IMAGENS (Correção para sets que o setSync.ts não conhece)
 // ============================================================================
 const CARD_IMAGE_OVERRIDES: Record<string, string> = {
+  // Cynthia's Garchomp ex (JTG 86 / 086)
+  'JTG-086': 'https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/JTG/JTG_086_R_EN.png',
+  'JTG-86': 'https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/JTG/JTG_086_R_EN.png',
   // Budew (SVI 9)
   'SVI-9': 'https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/SVI/SVI_009_R_EN.png',
   // Fan Rotom (ASC 250)
@@ -253,6 +257,14 @@ export const CARD_IMAGE_DATABASE: Record<string, CardMetadata> = {
   'psyduck':            { id: 'ASC-226',  name: 'Psyduck',        category: 'pokemon', energyType: 'water',     stage: 'BÁSICO',    hp: 60,  imageUrl: '', setCode: 'ASC',  setNumber: '226', localSetId: 'me2pt5' },
   "lillie's clefairy ex asc": { id: 'ASC-280', name: "Lillie's Clefairy ex", category: 'pokemon', energyType: 'psychic', stage: 'BÁSICO', hp: 190, imageUrl: '', setCode: 'ASC', setNumber: '280', localSetId: 'me2pt5' },
   "lillie's clefairy ex": { id: 'ASC-280', name: "Lillie's Clefairy ex", category: 'pokemon', energyType: 'psychic', stage: 'BÁSICO', hp: 190, imageUrl: '', setCode: 'ASC', setNumber: '280', localSetId: 'me2pt5' },
+  "cynthia's garchomp ex jtg": { id: 'JTG-086', name: "Cynthia's Garchomp ex", category: 'pokemon', energyType: 'dragon', stage: 'ESTÁGIO 2', hp: 320, imageUrl: '', setCode: 'JTG', setNumber: '086', localSetId: 'sv9' },
+  "cynthia's garchomp ex": { id: 'JTG-086', name: "Cynthia's Garchomp ex", category: 'pokemon', energyType: 'dragon', stage: 'ESTÁGIO 2', hp: 320, imageUrl: '', setCode: 'JTG', setNumber: '086', localSetId: 'sv9' },
+  "cynthia's gabite jtg":  { id: 'JTG-085', name: "Cynthia's Gabite", category: 'pokemon', energyType: 'dragon', stage: 'ESTÁGIO 1', hp: 100, imageUrl: '', setCode: 'JTG', setNumber: '085', localSetId: 'sv9' },
+  "cynthia's gabite":      { id: 'JTG-085', name: "Cynthia's Gabite", category: 'pokemon', energyType: 'dragon', stage: 'ESTÁGIO 1', hp: 100, imageUrl: '', setCode: 'JTG', setNumber: '085', localSetId: 'sv9' },
+  "cynthia's gible jtg":   { id: 'JTG-084', name: "Cynthia's Gible", category: 'pokemon', energyType: 'dragon', stage: 'BÁSICO', hp: 70, imageUrl: '', setCode: 'JTG', setNumber: '084', localSetId: 'sv9' },
+  "cynthia's gible":       { id: 'JTG-084', name: "Cynthia's Gible", category: 'pokemon', energyType: 'dragon', stage: 'BÁSICO', hp: 70, imageUrl: '', setCode: 'JTG', setNumber: '084', localSetId: 'sv9' },
+  "cynthia's roserade jtg":{ id: 'JTG-008', name: "Cynthia's Roserade", category: 'pokemon', energyType: 'grass', stage: 'ESTÁGIO 1', hp: 110, imageUrl: '', setCode: 'JTG', setNumber: '008', localSetId: 'sv9' },
+  "cynthia's roserade":    { id: 'JTG-008', name: "Cynthia's Roserade", category: 'pokemon', energyType: 'grass', stage: 'ESTÁGIO 1', hp: 110, imageUrl: '', setCode: 'JTG', setNumber: '008', localSetId: 'sv9' },
   'buneary pfl':        { id: 'PFL-83',   name: 'Buneary',        category: 'pokemon', energyType: 'colorless', stage: 'BÁSICO',    hp: 70,  imageUrl: '', setCode: 'PFL',  setNumber: '83',  localSetId: 'me2' },
   'buneary':            { id: 'PFL-83',   name: 'Buneary',        category: 'pokemon', energyType: 'colorless', stage: 'BÁSICO',    hp: 70,  imageUrl: '', setCode: 'PFL',  setNumber: '83',  localSetId: 'me2' },
   'lopunny':            { id: 'SVI-161',  name: 'Lopunny',        category: 'pokemon', energyType: 'colorless', stage: 'ESTÁGIO 1', hp: 100, imageUrl: '', setCode: 'SVI',  setNumber: '161', localSetId: 'sv1' },
@@ -405,6 +417,22 @@ export const CARD_ALIASES: Record<string, string> = {
   'clefairy ex da lilian':   "lillie's clefairy ex",
   'clefairy ex de lilian':   "lillie's clefairy ex",
   'lillies clefairy ex':     "lillie's clefairy ex",
+  'lillies clefairy':        "lillie's clefairy ex",
+  'clefairy da lilian':      "lillie's clefairy ex",
+  'garchomp ex da cynthia':  "cynthia's garchomp ex",
+  'garchomp ex de cynthia':  "cynthia's garchomp ex",
+  'garchomp da cynthia':     "cynthia's garchomp ex",
+  'cynthias garchomp ex':    "cynthia's garchomp ex",
+  'cynthias garchomp':       "cynthia's garchomp ex",
+  'cynthia garchomp ex':     "cynthia's garchomp ex",
+  'cynthia garchomp':        "cynthia's garchomp ex",
+  'gabite da cynthia':       "cynthia's gabite",
+  'cynthias gabite':         "cynthia's gabite",
+  'gible da cynthia':        "cynthia's gible",
+  'cynthias gible':          "cynthia's gible",
+  'roserade da cynthia':     "cynthia's roserade",
+  'cynthias roserade':       "cynthia's roserade",
+  'ambicao da cynthia':      "cynthia's ambition",
   'mega lopunny':            'mega lopunny ex',
 
   'ultra bola':              'ultra ball',
@@ -501,11 +529,8 @@ export function normalizeCardName(name: string): string {
 }
 
 export function getBasePokemonName(name: string): string {
-  const norm = normalizeCardName(name);
-  const words = norm.split(/[\s-]+/);
-  const ignored = ['ex','vstar','vmax','v','radiant','radiante','origin','forme','forma','origem','teal','mask','deck'];
-  const candidates = words.filter(w => !ignored.includes(w));
-  return candidates[0] || 'substitute';
+  if (!name) return 'substitute';
+  return sanitizePokemonCreatureName(name);
 }
 
 // ============================================================================

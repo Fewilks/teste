@@ -91,11 +91,49 @@ export function sanitizePokemonCreatureName(input: string): string {
   // 2. Remove acentuação
   s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-  // 3. Remove sufixos comuns de cartas TCG
+  // 3. Remove prefixos de treinadores/donos de cartas (ex: "Cynthia's Garchomp ex", "Lillie's Clefairy", "Red's Pikachu")
+  // e sufixos em português (ex: "Garchomp da Cynthia", "Clefairy da Lílian", "Pikachu do Red")
+  s = s.replace(/^[a-z0-9'\s-]+\'s\s+/i, '');
+  s = s.replace(/\b(cynthia|cynthias|lillie|lillies|lilian|red|reds|marnie|marnies|iono|ionos|steven|stevens|n)\'s?\s+/gi, '');
+  s = s.replace(/\s+(?:da|de|do)\s+(?:cynthia|lilian|lillie|red|marnie|iono|steven|n)\b/gi, '');
+
+  // 4. Remove sufixos comuns de cartas TCG
   s = s.replace(/\b(ex|vstar|vmax|v|radiant|radiante|baby|deck|forma|forme|origin|origem|paldea|galar|alola|hisui)\b/gi, '').trim();
 
-  // 4. Mapeamentos específicos diretos
+  // 5. Mapeamentos específicos diretos
   const exactMap: Record<string, string> = {
+    // Pokémon com dono / Treinadores (Cynthia, Lillie, Red, Marnie, etc.)
+    "cynthia's garchomp": 'garchomp',
+    'cynthias garchomp': 'garchomp',
+    'cynthia garchomp': 'garchomp',
+    'garchomp da cynthia': 'garchomp',
+    "cynthia's gabite": 'gabite',
+    'cynthias gabite': 'gabite',
+    'gabite da cynthia': 'gabite',
+    "cynthia's gible": 'gible',
+    'cynthias gible': 'gible',
+    'gible da cynthia': 'gible',
+    "cynthia's roserade": 'roserade',
+    'cynthias roserade': 'roserade',
+    'roserade da cynthia': 'roserade',
+    "cynthia's spiritomb": 'spiritomb',
+    "cynthia's milotic": 'milotic',
+    "cynthia's togekiss": 'togekiss',
+    "cynthia's lucario": 'lucario',
+    'clefairy ex': 'clefairy',
+    "lillie's clefairy": 'clefairy',
+    'lillies clefairy': 'clefairy',
+    'clefairy da lilian': 'clefairy',
+    "lillie's comfey": 'comfey',
+    "lillie's ribombee": 'ribombee',
+    "red's charizard": 'charizard',
+    "red's pikachu": 'pikachu',
+    "marnie's grimmsnarl": 'grimmsnarl',
+    "n's reshiram": 'reshiram',
+    "n's zekrom": 'zekrom',
+    "n's zoroark": 'zoroark',
+    "iono's bellibolt": 'bellibolt',
+
     'mega charizard x': 'charizard-megax',
     'mega charizard y': 'charizard-megay',
     'mega mewtwo x': 'mewtwo-megax',
@@ -136,9 +174,7 @@ export function sanitizePokemonCreatureName(input: string): string {
     'regidrago vstar': 'regidrago',
     'lugia vstar': 'lugia',
     'fezandipiti ex': 'fezandipiti',
-    'mew ex': 'mew',
-    'clefairy ex': 'clefairy',
-    "lillie's clefairy": 'clefairy'
+    'mew ex': 'mew'
   };
 
   const normalizedKey = s.replace(/\s+/g, ' ').trim();

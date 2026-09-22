@@ -941,7 +941,14 @@ export default function Decks({ currentMember }: DecksProps) {
                             {p2 ? <PokemonSprite name={p2} size="xs" /> : null}
                           </div>
                           <span className="text-[11px] font-bold text-slate-200 truncate block font-mono">
-                            {cleanPokemonName(p1).split(' ')[0]}{p2 ? `/${cleanPokemonName(p2).split(' ')[0]}` : ''}
+                            {(() => {
+                              const c1 = sanitizePokemonCreatureName(p1);
+                              const n1 = c1.charAt(0).toUpperCase() + c1.slice(1);
+                              if (!p2) return n1;
+                              const c2 = sanitizePokemonCreatureName(p2);
+                              const n2 = c2.charAt(0).toUpperCase() + c2.slice(1);
+                              return `${n1}/${n2}`;
+                            })()}
                           </span>
                         </div>
                       </div>
@@ -1047,143 +1054,43 @@ export default function Decks({ currentMember }: DecksProps) {
               </div>
 
               {/* Identificação do Arquétipo por Pokémon 1 e Pokémon 2 */}
-              <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-850 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wide flex items-center gap-1.5">
-                    <span>⚡</span> Identificação do Arquétipo
-                  </span>
-                  {rawText.trim() && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const detected = detectPokemonsFromDeckText(rawText);
-                        if (detected.p1) setPokemon1(detected.p1);
-                        if (detected.p2) setPokemon2(detected.p2);
-                      }}
-                      className="text-[11px] text-purple-400 hover:text-purple-300 font-semibold cursor-pointer flex items-center gap-1 hover:underline"
-                    >
-                      <Sparkles className="w-3 h-3 text-purple-400" /> Detectar da Lista
-                    </button>
-                  )}
+              {/* Identificação dos Pokémon (Campos normais de digitação) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Pokémon 1 (Principal) */}
+                <div className="space-y-1.5">
+                  <label htmlFor="import-deck-pokemon1" className="block text-xs font-semibold text-slate-300">
+                    Pokémon 1 (Principal): <span className="text-purple-400">*</span>
+                  </label>
+                  <input
+                    id="import-deck-pokemon1"
+                    type="text"
+                    placeholder="ex: Charizard ex, Lugia VSTAR"
+                    value={pokemon1}
+                    onChange={(e) => setPokemon1(e.target.value)}
+                    className="w-full p-2.5 bg-slate-900 border border-slate-800 focus:border-purple-500 rounded-lg text-white text-sm outline-none font-medium"
+                    required
+                  />
+                  <p className="text-[10px] text-slate-500">Atacante principal ou foco do deck</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Pokémon 1 (Principal) */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold text-slate-300">
-                      Pokémon 1 (Principal): <span className="text-purple-400">*</span>
+                {/* Pokémon 2 (Secundário / Suporte) */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label htmlFor="import-deck-pokemon2" className="block text-xs font-semibold text-slate-300">
+                      Pokémon 2 (Secundário):
                     </label>
-                    <div className="relative">
-                      <input
-                        id="import-deck-pokemon1"
-                        type="text"
-                        placeholder="ex: Charizard ex, Lugia VSTAR"
-                        value={pokemon1}
-                        onChange={(e) => setPokemon1(e.target.value)}
-                        className="w-full p-2.5 pl-10 bg-slate-900 border border-slate-800 focus:border-purple-500 rounded-lg text-white text-sm outline-none font-medium"
-                        required
-                      />
-                      <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
-                        <PokemonSprite name={pokemon1 || 'substitute'} size="sm" className="w-5 h-5 scale-125" />
-                      </div>
-                    </div>
-                    <p className="text-[10px] text-slate-500">Atacante principal ou foco do deck</p>
+                    <span className="text-[10px] text-slate-500 font-mono">Opcional</span>
                   </div>
-
-                  {/* Pokémon 2 (Secundário / Suporte) */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <label className="block text-xs font-semibold text-slate-300">
-                        Pokémon 2 (Secundário):
-                      </label>
-                      <span className="text-[10px] text-slate-500 font-mono">Opcional</span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        id="import-deck-pokemon2"
-                        type="text"
-                        placeholder="ex: Pidgeot ex, Dusclops"
-                        value={pokemon2}
-                        onChange={(e) => setPokemon2(e.target.value)}
-                        className="w-full p-2.5 pl-10 bg-slate-900 border border-slate-800 focus:border-purple-500 rounded-lg text-white text-sm outline-none font-medium"
-                      />
-                      <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
-                        {pokemon2.trim() ? (
-                          <PokemonSprite name={pokemon2} size="sm" className="w-5 h-5 scale-125" />
-                        ) : (
-                          <div className="w-4 h-4 rounded-full border border-dashed border-slate-700" />
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-[10px] text-slate-500">Suporte ou parceiro estratégico</p>
-                  </div>
+                  <input
+                    id="import-deck-pokemon2"
+                    type="text"
+                    placeholder="ex: Pidgeot ex, Dusclops"
+                    value={pokemon2}
+                    onChange={(e) => setPokemon2(e.target.value)}
+                    className="w-full p-2.5 bg-slate-900 border border-slate-800 focus:border-purple-500 rounded-lg text-white text-sm outline-none font-medium"
+                  />
+                  <p className="text-[10px] text-slate-500">Suporte ou parceiro estratégico</p>
                 </div>
-
-                {/* Live Archetype Banner */}
-                <div className="pt-2.5 border-t border-slate-850/80 flex items-center justify-between text-xs">
-                  <span className="text-slate-400 font-mono text-[11px]">Arquétipo Identificado:</span>
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center -space-x-1.5">
-                      <PokemonSprite name={pokemon1 || 'substitute'} size="xs" />
-                      {pokemon2.trim() && <PokemonSprite name={pokemon2} size="xs" />}
-                    </div>
-                    <span className="font-bold text-purple-300 font-mono text-xs">
-                      {pokemon1.trim() 
-                        ? (pokemon2.trim() ? `${pokemon1.trim()} / ${pokemon2.trim()}` : pokemon1.trim())
-                        : 'Digite o Pokémon 1...'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Quick Pokémon Chips from Decklist */}
-                {(() => {
-                  const pokemons = extractAllPokemonsFromDeck(rawText);
-                  if (pokemons.length === 0) return null;
-                  return (
-                    <div className="pt-2.5 border-t border-slate-850/80 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-slate-400 font-semibold block">
-                          Pokémon identificados na lista (clique para preencher):
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const detected = detectPokemonsFromDeckText(rawText);
-                            if (detected.p1) setPokemon1(detected.p1);
-                            if (detected.p2) setPokemon2(detected.p2);
-                          }}
-                          className="text-[10px] text-purple-400 hover:text-purple-300 font-bold flex items-center gap-1 cursor-pointer"
-                        >
-                          <Sparkles className="w-2.5 h-2.5 text-amber-400" />
-                          Auto Selecionar 2 Melhores
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
-                        {pokemons.map((p, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              if (!pokemon1.trim()) {
-                                setPokemon1(p.name);
-                              } else if (!pokemon2.trim()) {
-                                setPokemon2(p.name);
-                              } else {
-                                setPokemon1(p.name);
-                              }
-                            }}
-                            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-900 border border-slate-750 hover:border-purple-500 text-xs text-slate-200 hover:text-white transition-all cursor-pointer shadow-sm"
-                            title={`Clique para definir como Pokémon (${p.category})`}
-                          >
-                            <PokemonSprite name={p.spriteName} size="xs" />
-                            <span className="font-medium">{p.name}</span>
-                            <span className="text-[9px] text-slate-500 font-mono">x{p.count}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
               </div>
 
               {/* Paste box */}

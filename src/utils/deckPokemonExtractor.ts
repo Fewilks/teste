@@ -34,7 +34,8 @@ const EVOLUTION_FAMILIES: Record<string, string[]> = {
   magnezone: ['magnemite', 'magneton'],
   blastoise: ['squirtle', 'wartortle'],
   venusaur: ['bulbasaur', 'ivysaur'],
-  garchomp: ['gible', 'gabite'],
+  garchomp: ['gible', 'gabite', "cynthia's gible", "cynthia's gabite"],
+  roserade: ['roselia', "cynthia's roselia"],
   metagross: ['beldum', 'metang'],
   tyranitar: ['larvitar', 'pupitar'],
   dragonite: ['dratini', 'dragonair'],
@@ -45,6 +46,7 @@ const EVOLUTION_FAMILIES: Record<string, string[]> = {
 /**
  * Remove códigos de coleção, números de carta e sufixos do PTCGL
  * Mantém identificadores essenciais como "ex", "VSTAR", "VMAX", "Radiant", "Mega"
+ * e normaliza nomes canônicos de cartas de treinadores como Cynthia's Garchomp ex e Lillie's Clefairy ex.
  */
 export function cleanPokemonName(raw: string): string {
   if (!raw) return '';
@@ -52,11 +54,40 @@ export function cleanPokemonName(raw: string): string {
   // Remove parênteses (ex: "(TWM 130)")
   let name = raw.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
 
-  // Remove padrão de coleção no final (ex: "PAR 170", "SVI 196", "TWM 25", "TEF 123", "ASR 46")
+  // Remove padrão de coleção no final (ex: "PAR 170", "SVI 196", "TWM 25", "TEF 123", "ASR 46", "JTG 86", "JTG 086")
   name = name.replace(/\s+[A-Z0-9]{2,5}\s+\d+[a-zA-Z]?$/i, '').trim();
 
   // Remove quantidades no início caso existam (ex: "3 Charizard ex" -> "Charizard ex")
   name = name.replace(/^\d+\s+/, '').trim();
+
+  // Normalização precisa de cartas com Treinador/Dono no nome
+  // Caso 1: Variações de Cynthia's Garchomp ex
+  if (/(?:garchomp.*cynthia|cynthia.*garchomp)/i.test(name)) {
+    return "Cynthia's Garchomp ex";
+  }
+  // Caso 2: Variações de Lillie's Clefairy ex
+  if (/(?:clefairy.*lili|lili.*clefairy)/i.test(name)) {
+    return "Lillie's Clefairy ex";
+  }
+  // Caso 3: Outros Pokémon específicos da Cynthia
+  if (/(?:gabite.*cynthia|cynthia.*gabite)/i.test(name)) {
+    return "Cynthia's Gabite";
+  }
+  if (/(?:gible.*cynthia|cynthia.*gible)/i.test(name)) {
+    return "Cynthia's Gible";
+  }
+  if (/(?:roserade.*cynthia|cynthia.*roserade)/i.test(name)) {
+    return "Cynthia's Roserade";
+  }
+
+  // Se tiver prefixo cynthias sem apóstrofo
+  if (/^cynthias\s+/i.test(name)) {
+    name = name.replace(/^cynthias\s+/i, "Cynthia's ");
+  }
+  // Se tiver prefixo lillies sem apóstrofo
+  if (/^lillies\s+/i.test(name)) {
+    name = name.replace(/^lillies\s+/i, "Lillie's ");
+  }
 
   return name;
 }
@@ -99,7 +130,7 @@ export function extractAllPokemonsFromDeck(
         const candidate = match[2].trim();
 
         // Filtra falsos positivos de energias e treinadores comuns se não estiver explícito na seção
-        const isTrainerOrEnergy = /^(energia|energy|professor|arven|iono|boss|ultra ball|nest ball|buddy|super rod|rare candy|switch|earthen|vessel|prime catcher|counter catcher)\b/i.test(candidate);
+        const isTrainerOrEnergy = /^(energia|energy|professor|arven|iono|boss|ultra ball|nest ball|buddy|super rod|rare candy|switch|earthen|vessel|prime catcher|counter catcher|cynthia\'s ambition|cynthia\'s guidance|ambicao da cynthia|lillie\'s determination|determinacao da lilian)\b/i.test(candidate);
         
         if (!isTrainerOrEnergy && candidate.length > 2) {
           const cleaned = cleanPokemonName(candidate);

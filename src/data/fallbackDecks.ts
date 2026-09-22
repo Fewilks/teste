@@ -94,5 +94,21 @@ export const fallbackMetaDecks: MetaDeck[] = [
       { name: 'Energy Switch (SVI 173)', count: 4 }
     ],
     rawList: `Pokémon: 17\n3 Regidrago V SIT 135\n3 Regidrago VSTAR SIT 136\n3 Teal Mask Ogerpon ex TWM 25\n1 Giratina VSTAR LOR 131\n1 Noivern ex PAF 69\n1 Haxorus TWM 156\n1 Dragapult ex TWM 130\n1 Kyurem SFA 47\n1 Mew ex MEW 151\n1 Radiant Charizard PGO 11\n1 Fezandipiti ex TWM 96\n\nTrainer: 31\n4 Professor Sada's Vitality PAR 170\n3 Iono PAF 80\n2 Boss's Orders PAL 172\n4 Ultra Ball SVI 196\n4 Nest Ball SVI 181\n4 Energy Switch SVI 173\n4 Earthen Vessel PAR 163\n2 Super Rod PAL 188\n1 Superior Energy Retrieval PAL 189\n1 Prime Catcher TEF 157\n1 Pokégear 3.0 SVI 186\n1 Lost Vacuum LOR 162\n\nEnergy: 12\n6 Basic Grass Energy SVE 1\n3 Basic Fire Energy SVE 2\n3 Basic Psychic Energy SVE 13`
+  },
+  {
+    name: "Cynthia's Garchomp ex",
+    archetype: "Cynthia's Garchomp ex / Roserade",
+    share: 7,
+    winRate: 62.4,
+    imageUrl: 'https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/JTG/JTG_086_R_EN.png',
+    updatedAt: new Date().toISOString().split('T')[0],
+    description: 'Estratégia ofensiva com Cynthia\'s Garchomp ex e suporte de Cynthia\'s Roserade para controle de mesa e aceleração rápida com Cynthia\'s Ambition.',
+    cards: [
+      { name: "Cynthia's Garchomp ex (JTG 86)", count: 3 },
+      { name: "Cynthia's Roserade (JTG 8)", count: 2 },
+      { name: "Cynthia's Gabite (JTG 85)", count: 2 },
+      { name: "Cynthia's Gible (JTG 84)", count: 4 }
+    ],
+    rawList: `Pokémon: 18\n3 Cynthia's Garchomp ex JTG 86\n2 Cynthia's Gabite JTG 85\n4 Cynthia's Gible JTG 84\n2 Cynthia's Roserade JTG 8\n2 Cynthia's Roselia JTG 7\n1 Fezandipiti ex TWM 96\n1 Mew ex MEW 151\n1 Radiant Greninja ASR 46\n2 Budew ASC 16\n\nTrainer: 34\n4 Arven SVI 166\n4 Cynthia's Ambition BRS 138\n3 Iono PAF 80\n2 Boss's Orders PAL 172\n4 Buddy-Buddy Poffin TEF 144\n4 Ultra Ball SVI 196\n3 Rare Candy SVI 191\n2 Super Rod PAL 188\n2 Counter Catcher PAR 160\n1 Prime Catcher TEF 157\n2 Night Stretcher SFA 61\n3 Artazon PAL 171\n\nEnergy: 8\n5 Basic Fighting Energy SVE 6\n3 Basic Water Energy SVE 3`
   }
 ];
