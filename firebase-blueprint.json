@@ -1,0 +1,155 @@
+{
+  "entities": {
+    "Member": {
+      "title": "Member",
+      "description": "Represents a Spirits team player/member profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The UID of the user or member ID" },
+        "name": { "type": "string", "description": "The full name of the member" },
+        "role": { "type": "string", "enum": ["pokeball", "greatball", "ultraball", "masterball", "Premium ball"], "description": "The rank ball or staff status of the member" },
+        "nickname": { "type": "string", "description": "The in-game nickname" },
+        "avatarSprite": { "type": "string", "description": "The Pokémon representative avatar sprite name" },
+        "wins": { "type": "integer", "description": "Number of tournament wins" },
+        "losses": { "type": "integer", "description": "Number of tournament losses" },
+        "draws": { "type": "integer", "description": "Number of tournament draws" },
+        "favoriteCard": { "type": "string", "description": "The user's favorite physical card" },
+        "favoriteCardImage": { "type": "string", "description": "High-res TCG image URL of the favorite card" },
+        "joinDate": { "type": "string", "description": "The date the member joined the team (YYYY-MM-DD)" }
+      },
+      "required": ["id", "name", "role", "nickname", "avatarSprite", "wins", "losses", "draws", "joinDate"]
+    },
+    "CardItem": {
+      "title": "CardItem",
+      "description": "Represents a card in the shared team binder collection",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique ID of the physical card instance" },
+        "name": { "type": "string", "description": "Name of the card" },
+        "imageUrl": { "type": "string", "description": "Image URL of the card" },
+        "setCode": { "type": "string", "description": "The set code of the card" },
+        "setName": { "type": "string", "description": "The set name of the card" },
+        "setNumber": { "type": "string", "description": "The collector number in the set" },
+        "quantity": { "type": "integer", "description": "Quantity owned" },
+        "ownerId": { "type": "string", "description": "The member's ID who owns the card" },
+        "ownerName": { "type": "string", "description": "The member's name who owns the card" },
+        "isLendable": { "type": "boolean", "description": "Whether this card is available for loaning" },
+        "lentToUserId": { "type": "string", "description": "ID of the borrower if currently lent, otherwise null" },
+        "lentToUserName": { "type": "string", "description": "Name of the borrower if currently lent, otherwise null" },
+        "createdAt": { "type": "string", "description": "The record creation timestamp" }
+      },
+      "required": ["id", "name", "imageUrl", "setCode", "setName", "setNumber", "quantity", "ownerId", "ownerName", "isLendable"]
+    },
+    "LoanRecord": {
+      "title": "LoanRecord",
+      "description": "Represents a loan transaction of a shared card between players",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique transaction ID" },
+        "cardId": { "type": "string", "description": "The card's unique ID being lent" },
+        "cardName": { "type": "string", "description": "The name of the card" },
+        "cardImageUrl": { "type": "string", "description": "The image URL of the card" },
+        "ownerId": { "type": "string", "description": "Owner of the card" },
+        "ownerName": { "type": "string", "description": "Owner's display name" },
+        "borrowerId": { "type": "string", "description": "Borrower's member ID" },
+        "borrowerName": { "type": "string", "description": "Borrower's display name" },
+        "quantity": { "type": "integer", "description": "Number of copies lent" },
+        "status": { "type": "string", "enum": ["pending", "active", "returned", "rejected"], "description": "The current loan state" },
+        "requestedAt": { "type": "string", "description": "The loan request timestamp" },
+        "loanedAt": { "type": "string", "description": "The physical loan acceptance timestamp" },
+        "returnedAt": { "type": "string", "description": "The return timestamp" }
+      },
+      "required": ["id", "cardId", "cardName", "ownerId", "ownerName", "borrowerId", "borrowerName", "quantity", "status", "requestedAt"]
+    },
+    "MatchRecord": {
+      "title": "MatchRecord",
+      "description": "Represents a physical/digital match played by a team member",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique match log ID" },
+        "player1Id": { "type": "string", "description": "Logged-in player ID (must be a team member)" },
+        "player1Name": { "type": "string", "description": "Player 1 name" },
+        "player1Sprite": { "type": "string", "description": "Player 1 avatar sprite" },
+        "player2Name": { "type": "string", "description": "Opponent name" },
+        "player2IsMember": { "type": "boolean", "description": "Whether opponent is another Spirits team member" },
+        "player2Id": { "type": "string", "description": "Opponent member ID if player2IsMember is true, otherwise null" },
+        "deckName": { "type": "string", "description": "Deck used by Player 1" },
+        "deckArchetype": { "type": "string", "description": "Deck archetype used by Player 1" },
+        "opponentDeck": { "type": "string", "description": "Deck used by the opponent" },
+        "format": { "type": "string", "description": "Match format (e.g., MD1, MD3)" },
+        "result": { "type": "string", "enum": ["win", "loss", "draw"], "description": "Match result for Player 1" },
+        "score": { "type": "string", "description": "Detailed match score (e.g., 2-1)" },
+        "playedAt": { "type": "string", "description": "Date/time match was played" },
+        "notes": { "type": "string", "description": "Tactical notes or description of the match" }
+      },
+      "required": ["id", "player1Id", "player1Name", "player2Name", "player2IsMember", "deckName", "deckArchetype", "opponentDeck", "format", "result", "score", "playedAt"]
+    },
+    "DeckRecord": {
+      "title": "DeckRecord",
+      "description": "Represents a shared team deck list",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique deck registration ID" },
+        "userId": { "type": "string", "description": "Creator/owner member ID" },
+        "userName": { "type": "string", "description": "Creator's name" },
+        "deckName": { "type": "string", "description": "Name of the deck" },
+        "archetype": { "type": "string", "description": "Deck archetype" },
+        "pokemon1": { "type": "string", "description": "Primary Pokemon identifying the archetype" },
+        "pokemon2": { "type": "string", "description": "Secondary Pokemon identifying the archetype (optional)" },
+        "rawList": { "type": "string", "description": "Raw copy-pasted decklist text" },
+        "parsedCards": { "type": "array", "description": "Parsed card items with counts and categories" },
+        "createdAt": { "type": "string", "description": "Deck registry creation timestamp" }
+      },
+      "required": ["id", "userId", "userName", "deckName", "archetype", "rawList", "createdAt"]
+    },
+    "TrainerLog": {
+      "title": "TrainerLog",
+      "description": "Represents an imported PTCGL battle log with full turn-by-turn breakdown and stats",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique log ID" },
+        "userId": { "type": "string", "description": "Owner member ID" },
+        "player1Name": { "type": "string", "description": "Player 1 name" },
+        "player2Name": { "type": "string", "description": "Opponent player name" },
+        "playerDeckArchetype": { "type": "string", "description": "Archetype used by player 1" },
+        "opponentDeckArchetype": { "type": "string", "description": "Archetype used by opponent" },
+        "result": { "type": "string", "enum": ["win", "loss", "draw"], "description": "Battle outcome" },
+        "wentFirst": { "type": "boolean", "description": "Whether player 1 went first" },
+        "totalTurns": { "type": "integer", "description": "Total turns played" },
+        "p1PrizesTaken": { "type": "integer", "description": "Prizes taken by player 1" },
+        "p2PrizesTaken": { "type": "integer", "description": "Prizes taken by opponent" },
+        "format": { "type": "string", "description": "Game format" },
+        "date": { "type": "string", "description": "Date of match" },
+        "rawLog": { "type": "string", "description": "Raw battle log text" },
+        "turns": { "type": "array", "description": "Turn-by-turn snapshots" }
+      },
+      "required": ["id", "userId", "player1Name", "player2Name", "playerDeckArchetype", "opponentDeckArchetype", "result", "wentFirst", "totalTurns", "date", "rawLog"]
+    }
+  },
+  "firestore": {
+    "members/{memberId}": {
+      "schema": "Member",
+      "description": "The team roster profiles"
+    },
+    "collection/{cardId}": {
+      "schema": "CardItem",
+      "description": "The collective card binder pool"
+    },
+    "loans/{loanId}": {
+      "schema": "LoanRecord",
+      "description": "Player card loan transactions"
+    },
+    "matches/{matchId}": {
+      "schema": "MatchRecord",
+      "description": "Logged tournament/training matches"
+    },
+    "decks/{deckId}": {
+      "schema": "DeckRecord",
+      "description": "Shared deck lists built by members"
+    },
+    "trainer_logs/{logId}": {
+      "schema": "TrainerLog",
+      "description": "Imported Pokémon TCG Live battle logs and replays"
+    }
+  }
+}
