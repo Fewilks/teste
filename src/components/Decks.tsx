@@ -25,51 +25,30 @@ import { getArchetypeSprites } from './Matches';
 import { fallbackMetaDecks } from '../data/fallbackDecks';
 import { fetchLiveMetaDecks, getStoredMetaDecks } from '../services/limitlessApi';
 import { normalizePokemonCard, parsePTCGLDeckList, getPTCGLId } from '../services/cardNormalizationService';
+import { 
+  extractAllPokemonsFromDeck, 
+  getTopTwoPokemons, 
+  cleanPokemonName, 
+  ExtractedPokemonInfo 
+} from '../utils/deckPokemonExtractor';
+import { sanitizePokemonCreatureName } from '../utils/pokemonSprites';
 
 function detectPokemonsFromDeckText(text: string): { p1?: string; p2?: string } {
   if (!text) return {};
-  const lines = text.split('\n');
-  const detected: string[] = [];
-
-  let inPokemonSection = false;
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    if (/^(pokémon|pokemon)\b/i.test(trimmed)) {
-      inPokemonSection = true;
-      continue;
-    }
-    if (/^(treinador|trainer|energia|energy)\b/i.test(trimmed)) {
-      inPokemonSection = false;
-      break;
-    }
-
-    const match = trimmed.match(/^\d+\s+([A-Za-z0-9\s\-\'\.]+?)(?:\s+[A-Z0-9]{2,5}\s+\d+.*)?$/i);
-    if (match) {
-      const rawName = match[1].trim();
-      if (!/energia|energy/i.test(rawName) && rawName.length > 2) {
-        if (!detected.includes(rawName)) {
-          detected.push(rawName);
-        }
-      }
-    }
-  }
-
-  detected.sort((a, b) => {
-    const aScore = /\b(ex|vstar|vmax|v)\b/i.test(a) ? 2 : 1;
-    const bScore = /\b(ex|vstar|vmax|v)\b/i.test(b) ? 2 : 1;
-    return bScore - aScore;
-  });
-
+  const result = getTopTwoPokemons(text);
   return {
-    p1: detected[0] || '',
-    p2: detected[1] || ''
+    p1: result.pokemon1,
+    p2: result.pokemon2
   };
 }
 
-const getDeckSprites = (deck: { archetype: string; pokemon1?: string; pokemon2?: string }): string[] => {
+const getDeckSprites = (deck: { archetype: string; pokemon1?: string; pokemon2?: string; rawList?: string }): string[] => {
   if (deck.pokemon1) {
     return deck.pokemon2 ? [deck.pokemon1, deck.pokemon2] : [deck.pokemon1];
+  }
+  if (deck.rawList) {
+    const extracted = getTopTwoPokemons(deck.rawList, undefined, deck.archetype);
+    if (extracted.sprites.length > 0) return extracted.sprites;
   }
   return getArchetypeSprites(deck.archetype);
 };
@@ -118,6 +97,50 @@ export default function Decks({ currentMember }: DecksProps) {
     const cached = getStoredMetaDecks();
     return cached?.playersCount;
   });
+
+  // Modal de Seleção de Sprites para Baralhos do Limitless a partir da Leitura de Cartas
+  const [spriteModalDeck, setSpriteModalDeck] = useState<{
+    deck: any;
+    deckIndex: number;
+    extractedPokemons: ExtractedPokemonInfo[];
+    selectedP1: string;
+    selectedP2: string;
+  } | null>(null);
+
+  const handleOpenSpriteSelector = (deck: any, deckIndex: number) => {
+    const extracted = extractAllPokemonsFromDeck(deck.rawList, deck.cards);
+    const top = getTopTwoPokemons(deck.rawList, deck.cards, deck.name);
+    const currentP1 = deck.pokemon1 || top.pokemon1 || (extracted[0]?.name || '');
+    const currentP2 = deck.pokemon2 !== undefined ? deck.pokemon2 : (top.pokemon2 || (extracted[1]?.name || ''));
+
+    setSpriteModalDeck({
+      deck,
+      deckIndex,
+      extractedPokemons: extracted,
+      selectedP1: currentP1,
+      selectedP2: currentP2
+    });
+  };
+
+  const handleSaveSprites = (p1: string, p2: string) => {
+    if (!spriteModalDeck) return;
+    const { deckIndex } = spriteModalDeck;
+
+    setMetaDecks(prev => {
+      const updated = [...prev];
+      if (updated[deckIndex]) {
+        updated[deckIndex] = {
+          ...updated[deckIndex],
+          pokemon1: p1,
+          pokemon2: p2,
+          sprites: [sanitizePokemonCreatureName(p1), sanitizePokemonCreatureName(p2)].filter(Boolean)
+        };
+      }
+      return updated;
+    });
+
+    setSpriteModalDeck(null);
+  };
 
   useEffect(() => {
     async function loadDecks() {
@@ -223,15 +246,16 @@ export default function Decks({ currentMember }: DecksProps) {
         };
       });
       
-      const metaParts = (metaDeck.name || '').split(/[\/\+]/);
-      const p1 = (metaParts[0] || metaDeck.name || '').trim();
-      const p2 = (metaParts[1] || '').trim();
+      // Extrai os 2 Pokémon principais a partir da leitura da lista de cartas do baralho
+      const detected = getTopTwoPokemons(metaDeck.rawList, metaDeck.cards, metaDeck.name);
+      const p1 = metaDeck.pokemon1 || detected.pokemon1;
+      const p2 = metaDeck.pokemon2 !== undefined ? metaDeck.pokemon2 : detected.pokemon2;
 
       const newDeck: Omit<DeckRecord, 'id'> = {
         userId: currentMember.id,
         userName: currentMember.name,
         deckName: `Meta - ${metaDeck.name}`,
-        archetype: metaDeck.name,
+        archetype: p2 ? `${p1} / ${p2}` : p1 || metaDeck.name,
         pokemon1: p1,
         pokemon2: p2,
         rawList: metaDeck.rawList,
@@ -818,7 +842,12 @@ export default function Decks({ currentMember }: DecksProps) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="limitless-meta-grid">
-              {metaDecks.map((deck, idx) => (
+              {metaDecks.map((deck, idx) => {
+                const detected = getTopTwoPokemons(deck.rawList, deck.cards, deck.name);
+                const p1 = deck.pokemon1 || detected.pokemon1;
+                const p2 = deck.pokemon2 !== undefined ? deck.pokemon2 : detected.pokemon2;
+
+                return (
                 <div 
                   key={`${deck.name}-${idx}`} 
                   className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between hover:border-purple-500/40 transition-all duration-300 shadow-xl relative overflow-hidden group"
@@ -853,6 +882,35 @@ export default function Decks({ currentMember }: DecksProps) {
                       </div>
                     </div>
 
+                    {/* 2 Sprites Principais Detectados da Leitura da Lista de Cartas */}
+                    <div className="bg-slate-950/70 p-3 rounded-xl border border-purple-500/25 flex items-center justify-between gap-3 shadow-inner">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center -space-x-2 shrink-0 bg-slate-900/90 p-1.5 rounded-xl border border-purple-500/30 shadow-md">
+                          <PokemonSprite name={p1 || 'substitute'} size="md" />
+                          {p2 ? <PokemonSprite name={p2} size="md" /> : null}
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1">
+                            <Sparkles className="w-3 h-3 text-amber-400" />
+                            Sprites Principais (Leitura da Lista)
+                          </span>
+                          <p className="text-xs font-bold text-white truncate mt-0.5">
+                            {p1}{p2 ? ` • ${p2}` : ''}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenSpriteSelector(deck, idx)}
+                        className="px-2.5 py-1.5 text-[11px] font-bold text-purple-300 hover:text-white bg-purple-900/40 hover:bg-purple-800/60 rounded-lg border border-purple-500/40 transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm"
+                        title="Escolher 2 Pokémon principais a partir da lista de cartas"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        <span>Escolher Sprites</span>
+                      </button>
+                    </div>
+
                     {/* Strategy Description */}
                     <p className="text-xs text-slate-300 leading-relaxed font-sans">{deck.description}</p>
 
@@ -877,12 +935,14 @@ export default function Decks({ currentMember }: DecksProps) {
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-500 uppercase font-bold block">Principais</span>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {(deck.cards || []).slice(0, 2).map((c: any, i: number) => (
-                            <span key={i} className="text-[9px] bg-slate-900 text-slate-400 px-1 py-0.5 rounded border border-slate-800 font-mono truncate max-w-full block" title={c.name}>
-                              {c.name.split(' (')[0]}
-                            </span>
-                          ))}
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <div className="flex items-center -space-x-1.5 shrink-0">
+                            <PokemonSprite name={p1 || 'substitute'} size="xs" />
+                            {p2 ? <PokemonSprite name={p2} size="xs" /> : null}
+                          </div>
+                          <span className="text-[11px] font-bold text-slate-200 truncate block font-mono">
+                            {cleanPokemonName(p1).split(' ')[0]}{p2 ? `/${cleanPokemonName(p2).split(' ')[0]}` : ''}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -931,7 +991,8 @@ export default function Decks({ currentMember }: DecksProps) {
                   </button>
                 </div>
               </div>
-            ))}
+            );
+          })}
             </div>
           </div>
         )
@@ -1073,6 +1134,56 @@ export default function Decks({ currentMember }: DecksProps) {
                     </span>
                   </div>
                 </div>
+
+                {/* Quick Pokémon Chips from Decklist */}
+                {(() => {
+                  const pokemons = extractAllPokemonsFromDeck(rawText);
+                  if (pokemons.length === 0) return null;
+                  return (
+                    <div className="pt-2.5 border-t border-slate-850/80 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400 font-semibold block">
+                          Pokémon identificados na lista (clique para preencher):
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const detected = detectPokemonsFromDeckText(rawText);
+                            if (detected.p1) setPokemon1(detected.p1);
+                            if (detected.p2) setPokemon2(detected.p2);
+                          }}
+                          className="text-[10px] text-purple-400 hover:text-purple-300 font-bold flex items-center gap-1 cursor-pointer"
+                        >
+                          <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                          Auto Selecionar 2 Melhores
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                        {pokemons.map((p, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              if (!pokemon1.trim()) {
+                                setPokemon1(p.name);
+                              } else if (!pokemon2.trim()) {
+                                setPokemon2(p.name);
+                              } else {
+                                setPokemon1(p.name);
+                              }
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-900 border border-slate-750 hover:border-purple-500 text-xs text-slate-200 hover:text-white transition-all cursor-pointer shadow-sm"
+                            title={`Clique para definir como Pokémon (${p.category})`}
+                          >
+                            <PokemonSprite name={p.spriteName} size="xs" />
+                            <span className="font-medium">{p.name}</span>
+                            <span className="text-[9px] text-slate-500 font-mono">x{p.count}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Paste box */}
@@ -1133,6 +1244,219 @@ Pokémon: 3
 
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Escolher os 2 Sprites Principais a partir da Leitura de Cartas do Baralho Limitless */}
+      {spriteModalDeck && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="choose-sprites-modal">
+          <div className="bg-slate-900 border border-purple-500/40 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-purple-950/60 to-slate-900">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-purple-600/20 border border-purple-500/30 rounded-xl">
+                  <Sparkles className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Escolher Sprites Principais</h3>
+                  <p className="text-xs text-purple-300 truncate max-w-[280px] sm:max-w-md">
+                    {spriteModalDeck.deck.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSpriteModalDeck(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Current selection preview */}
+            <div className="p-4 bg-slate-950/60 border-b border-slate-800/80">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+                Sprites Selecionados Atualmente:
+              </span>
+              <div className="grid grid-cols-2 gap-3">
+                {/* Slot 1 */}
+                <div className="bg-slate-900 p-2.5 rounded-xl border border-purple-500/30 flex items-center gap-2.5">
+                  <div className="p-1 bg-slate-950 rounded-lg shrink-0">
+                    <PokemonSprite name={spriteModalDeck.selectedP1 || 'substitute'} size="md" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[9px] font-bold uppercase text-purple-400 block">1º Pokémon (Principal)</span>
+                    <p className="text-xs font-bold text-white truncate">{spriteModalDeck.selectedP1 || 'Nenhum'}</p>
+                  </div>
+                </div>
+
+                {/* Slot 2 */}
+                <div className="bg-slate-900 p-2.5 rounded-xl border border-purple-500/30 flex items-center gap-2.5">
+                  <div className="p-1 bg-slate-950 rounded-lg shrink-0">
+                    {spriteModalDeck.selectedP2 ? (
+                      <PokemonSprite name={spriteModalDeck.selectedP2} size="md" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full border border-dashed border-slate-700 flex items-center justify-center text-xs text-slate-500 font-mono">
+                        -
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-bold uppercase text-purple-400 block">2º Pokémon</span>
+                      {spriteModalDeck.selectedP2 && (
+                        <button
+                          type="button"
+                          onClick={() => setSpriteModalDeck(prev => prev ? { ...prev, selectedP2: '' } : null)}
+                          className="text-[9px] text-slate-500 hover:text-rose-400 cursor-pointer"
+                        >
+                          Limpar
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs font-bold text-white truncate">{spriteModalDeck.selectedP2 || 'Nenhum'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* List of Pokémons detected in the decklist */}
+            <div className="p-4 overflow-y-auto space-y-2 flex-1">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-slate-300">
+                  Pokémon na lista de cartas ({spriteModalDeck.extractedPokemons.length}):
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const top = getTopTwoPokemons(spriteModalDeck.deck.rawList, spriteModalDeck.deck.cards, spriteModalDeck.deck.name);
+                    setSpriteModalDeck(prev => prev ? {
+                      ...prev,
+                      selectedP1: top.pokemon1,
+                      selectedP2: top.pokemon2
+                    } : null);
+                  }}
+                  className="text-[11px] text-purple-400 hover:text-purple-300 font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <Sparkles className="w-3 h-3 text-amber-400" />
+                  Auto-Detectar Melhores
+                </button>
+              </div>
+
+              {spriteModalDeck.extractedPokemons.length === 0 ? (
+                <div className="text-center py-6 text-slate-500 text-xs">
+                  Nenhum Pokémon identificado automaticamente na lista de cartas.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {spriteModalDeck.extractedPokemons.map((poke, pIdx) => {
+                    const isP1 = spriteModalDeck.selectedP1.toLowerCase() === poke.name.toLowerCase();
+                    const isP2 = spriteModalDeck.selectedP2.toLowerCase() === poke.name.toLowerCase();
+
+                    return (
+                      <div
+                        key={`${poke.name}-${pIdx}`}
+                        className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                          isP1 || isP2 
+                            ? 'bg-purple-950/40 border-purple-500/60 shadow-md' 
+                            : 'bg-slate-950/40 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="p-1 bg-slate-900 rounded-lg shrink-0">
+                            <PokemonSprite name={poke.spriteName} size="md" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-bold text-white truncate">{poke.name}</h4>
+                              <span className="text-[10px] px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded font-mono">
+                                x{poke.count}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                                poke.category === 'Ace' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                                poke.category === 'Evolução Chave' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' :
+                                'bg-slate-800 text-slate-400'
+                              }`}>
+                                {poke.category}
+                              </span>
+                              {isP1 && (
+                                <span className="text-[9px] bg-purple-600 text-white font-black px-1.5 py-0.5 rounded">
+                                  1º Sprite
+                                </span>
+                              )}
+                              {isP2 && (
+                                <span className="text-[9px] bg-indigo-600 text-white font-black px-1.5 py-0.5 rounded">
+                                  2º Sprite
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSpriteModalDeck(prev => prev ? {
+                                ...prev,
+                                selectedP1: poke.name,
+                                selectedP2: isP2 ? '' : prev.selectedP2
+                              } : null);
+                            }}
+                            className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
+                              isP1
+                                ? 'bg-purple-600 text-white border-purple-500'
+                                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white'
+                            }`}
+                          >
+                            1º Slot
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSpriteModalDeck(prev => prev ? {
+                                ...prev,
+                                selectedP1: isP1 ? '' : prev.selectedP1,
+                                selectedP2: poke.name
+                              } : null);
+                            }}
+                            className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
+                              isP2
+                                ? 'bg-indigo-600 text-white border-indigo-500'
+                                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white'
+                            }`}
+                          >
+                            2º Slot
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setSpriteModalDeck(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveSprites(spriteModalDeck.selectedP1, spriteModalDeck.selectedP2)}
+                className="px-4 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded-xl transition-all shadow-lg shadow-purple-900/30 cursor-pointer flex items-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                Aplicar Sprites
+              </button>
+            </div>
           </div>
         </div>
       )}

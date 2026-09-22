@@ -96,6 +96,9 @@ export interface MetaDeck {
   description: string;
   updatedAt?: string;
   rawList?: string;
+  pokemon1?: string;
+  pokemon2?: string;
+  sprites?: string[];
 }
 
 export interface BattleTurnAction {

@@ -49,6 +49,7 @@ export default function App() {
   const [currentMember, setCurrentMember] = useState<Member | null>(null);
   const [loading, setLoading] = useState(true);
   const [showProfileSwitcher, setShowProfileSwitcher] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
 
   // Bootstrap Firebase Firestore and retrieve members list on load
   const loadPortalData = async (userUid?: string) => {
@@ -260,21 +261,16 @@ export default function App() {
           {/* Spirits Team Branding Brand Header */}
           <div className="flex items-center gap-3 border-b border-slate-850/60 pb-5">
             <div className="w-10 h-10 bg-gradient-to-tr from-purple-650 to-indigo-650 rounded-xl flex items-center justify-center shadow-lg shadow-purple-950/50 border border-purple-400/20 shrink-0 overflow-hidden relative">
-              <img 
-                src="./logo-spirits.png" 
-                alt="Spirits Logo" 
-                className="w-full h-full object-contain p-1"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  const parent = e.currentTarget.parentElement;
-                  if (parent && !parent.querySelector('.fallback-emoji')) {
-                    const span = document.createElement('span');
-                    span.className = 'text-2xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)] fallback-emoji';
-                    span.innerText = '👻';
-                    parent.appendChild(span);
-                  }
-                }}
-              />
+              {!logoFailed ? (
+                <img 
+                  src={`${import.meta.env.BASE_URL}logo-spirits.png`} 
+                  alt="Spirits Logo" 
+                  className="w-full h-full object-contain p-1"
+                  onError={() => setLogoFailed(true)}
+                />
+              ) : (
+                <span className="text-2xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">👻</span>
+              )}
             </div>
             <div>
               <h1 className="text-lg font-black tracking-tight text-white flex items-center gap-1">

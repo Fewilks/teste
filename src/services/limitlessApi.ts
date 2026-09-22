@@ -1,6 +1,7 @@
 import { MetaDeck } from '../types';
 import { fallbackMetaDecks } from '../data/fallbackDecks';
 import { limitlessUrl } from '../utils/setSync';
+import { getTopTwoPokemons } from '../utils/deckPokemonExtractor';
 
 export interface LimitlessApiResponse {
   decks: MetaDeck[];
@@ -14,6 +15,24 @@ export interface LimitlessApiResponse {
 export const METAGAME_CACHE_KEY = 'spirits_metagame_cache';
 
 /**
+ * Enriquece os baralhos do Limitless TCG com a leitura de dados da lista de cartas,
+ * determinando automaticamente os 2 Pokémon e sprites principais.
+ */
+export function enrichMetaDecksWithSprites(decks: MetaDeck[]): MetaDeck[] {
+  if (!Array.isArray(decks)) return [];
+  return decks.map(d => {
+    if (d.pokemon1 && d.sprites && d.sprites.length > 0) return d;
+    const extracted = getTopTwoPokemons(d.rawList, d.cards, d.name);
+    return {
+      ...d,
+      pokemon1: d.pokemon1 || extracted.pokemon1,
+      pokemon2: d.pokemon2 || extracted.pokemon2,
+      sprites: d.sprites && d.sprites.length > 0 ? d.sprites : extracted.sprites
+    };
+  });
+}
+
+/**
  * Lê o último estado do metagame salvo em localStorage.
  * Retorna null se não houver dados gravados ou se a estrutura estiver corrompida.
  */
@@ -25,7 +44,7 @@ export function getStoredMetaDecks(): LimitlessApiResponse | null {
     const parsed = JSON.parse(raw);
     if (parsed && Array.isArray(parsed.decks) && parsed.decks.length > 0) {
       return {
-        decks: parsed.decks,
+        decks: enrichMetaDecksWithSprites(parsed.decks),
         tournamentName: parsed.tournamentName || 'Metagame (Cache Local)',
         tournamentDate: parsed.tournamentDate,
         playersCount: parsed.playersCount,
@@ -46,8 +65,9 @@ export function saveStoredMetaDecks(data: LimitlessApiResponse): boolean {
   if (typeof window === 'undefined') return false;
   try {
     if (data && Array.isArray(data.decks) && data.decks.length > 0 && data.source !== 'offline-fallback') {
+      const enrichedDecks = enrichMetaDecksWithSprites(data.decks);
       const payload = {
-        decks: data.decks,
+        decks: enrichedDecks,
         tournamentName: data.tournamentName,
         tournamentDate: data.tournamentDate || new Date().toISOString().split('T')[0],
         playersCount: data.playersCount,
@@ -314,7 +334,7 @@ export async function fetchLiveMetaDecks(forceRefresh = true): Promise<Limitless
             const rawDecks = data.decks || (Array.isArray(data) ? data : []);
             if (Array.isArray(rawDecks) && rawDecks.length > 0) {
               const response: LimitlessApiResponse = {
-                decks: rawDecks,
+                decks: enrichMetaDecksWithSprites(rawDecks),
                 tournamentName: data.tournamentName || 'Limitless Premier Metagame',
                 tournamentDate: data.tournamentDate || new Date().toISOString().split('T')[0],
                 playersCount: data.playersCount,
@@ -351,7 +371,7 @@ export async function fetchLiveMetaDecks(forceRefresh = true): Promise<Limitless
 
       // Fallback seguro de emergência caso não haja conexão nem dados prévios em cache
       const fallbackResponse: LimitlessApiResponse = {
-        decks: fallbackMetaDecks,
+        decks: enrichMetaDecksWithSprites(fallbackMetaDecks),
         tournamentName: 'Pokémon World Championships (Modo Offline de Contingência)',
         tournamentDate: new Date().toISOString().split('T')[0],
         playersCount: 200,
