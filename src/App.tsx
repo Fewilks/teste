@@ -30,6 +30,7 @@ import {
 import PokemonSprite from './components/PokemonSprite';
 import PokemonLoader from './components/PokemonLoader';
 import { getRoleBadge } from './utils';
+import { fetchLiveMetaDecks, getStoredMetaDecks, saveStoredMetaDecks } from './services/limitlessApi';
 
 export function getRoleRankValue(role: string): number {
   const normalized = (role || '').toLowerCase().replace(/\s+/g, '');
@@ -152,6 +153,36 @@ export default function App() {
         }
       } catch (collErr) {
         console.warn('Could not auto-register collection cards into TrainerLog image resolver:', collErr);
+      }
+
+      // Estratégia de cache em localStorage para o Metagame oficial (Limitless TCG)
+      try {
+        console.info('[Spirits Portal] Sincronizando dados competitivos do metagame...');
+        const metaResult = await fetchLiveMetaDecks(true);
+        if (metaResult && Array.isArray(metaResult.decks) && metaResult.decks.length > 0 && metaResult.source !== 'offline-fallback') {
+          saveStoredMetaDecks(metaResult);
+          console.info(`[Spirits Portal] Metagame salvo em localStorage com sucesso: "${metaResult.tournamentName}" (${metaResult.decks.length} baralhos).`);
+        } else {
+          // Se a chamada externa retornou fallback offline, recupera o último estado válido salvo no localStorage
+          const lastSaved = getStoredMetaDecks();
+          if (lastSaved && lastSaved.decks.length > 0) {
+            console.info(`[Spirits Portal] Chamada externa sem novos dados. Utilizando último estado salvo no localStorage: "${lastSaved.tournamentName}" (${lastSaved.decks.length} baralhos).`);
+          } else if (metaResult) {
+            saveStoredMetaDecks(metaResult);
+          }
+        }
+      } catch (metaErr) {
+        console.warn('[Spirits Portal] Falha na chamada externa do metagame em loadPortalData. Recuperando último estado no localStorage:', metaErr);
+        try {
+          const fallbackCached = getStoredMetaDecks();
+          if (fallbackCached && fallbackCached.decks.length > 0) {
+            console.info(`[Spirits Portal] Recuperado com sucesso do cache local (localStorage): "${fallbackCached.tournamentName}" (${fallbackCached.decks.length} baralhos).`);
+          } else {
+            console.warn('[Spirits Portal] Nenhum metagame anterior encontrado no localStorage. O sistema utilizará os decks padrão de contingência.');
+          }
+        } catch (storageErr) {
+          console.error('[Spirits Portal] Erro ao acessar localStorage para metagame:', storageErr);
+        }
       }
     } catch (err) {
       console.error('Error bootstrapping Spirits portal:', err);

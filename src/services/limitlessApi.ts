@@ -7,7 +7,60 @@ export interface LimitlessApiResponse {
   tournamentName: string;
   tournamentDate?: string;
   playersCount?: number;
-  source: 'api-server' | 'api-direct-limitless' | 'offline-fallback';
+  source: 'api-server' | 'api-direct-limitless' | 'offline-fallback' | 'local-storage-cache';
+  cachedAt?: string;
+}
+
+export const METAGAME_CACHE_KEY = 'spirits_metagame_cache';
+
+/**
+ * Lê o último estado do metagame salvo em localStorage.
+ * Retorna null se não houver dados gravados ou se a estrutura estiver corrompida.
+ */
+export function getStoredMetaDecks(): LimitlessApiResponse | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(METAGAME_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && Array.isArray(parsed.decks) && parsed.decks.length > 0) {
+      return {
+        decks: parsed.decks,
+        tournamentName: parsed.tournamentName || 'Metagame (Cache Local)',
+        tournamentDate: parsed.tournamentDate,
+        playersCount: parsed.playersCount,
+        source: 'local-storage-cache',
+        cachedAt: parsed.cachedAt
+      };
+    }
+  } catch (e) {
+    console.warn('Erro ao ler cache de metagame do localStorage:', e);
+  }
+  return null;
+}
+
+/**
+ * Persiste os dados válidos do metagame no localStorage do navegador.
+ */
+export function saveStoredMetaDecks(data: LimitlessApiResponse): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (data && Array.isArray(data.decks) && data.decks.length > 0 && data.source !== 'offline-fallback') {
+      const payload = {
+        decks: data.decks,
+        tournamentName: data.tournamentName,
+        tournamentDate: data.tournamentDate || new Date().toISOString().split('T')[0],
+        playersCount: data.playersCount,
+        source: data.source,
+        cachedAt: new Date().toISOString()
+      };
+      localStorage.setItem(METAGAME_CACHE_KEY, JSON.stringify(payload));
+      return true;
+    }
+  } catch (e) {
+    console.warn('Erro ao salvar metagame no localStorage:', e);
+  }
+  return false;
 }
 
 // In-memory client cache and deduplication
@@ -267,6 +320,7 @@ export async function fetchLiveMetaDecks(forceRefresh = true): Promise<Limitless
                 playersCount: data.playersCount,
                 source: 'api-server'
               };
+              saveStoredMetaDecks(response);
               cachedMetaResponse = { data: response, timestamp: Date.now() };
               return response;
             }
@@ -280,6 +334,7 @@ export async function fetchLiveMetaDecks(forceRefresh = true): Promise<Limitless
       try {
         const directResult = await fetchLimitlessDirect();
         if (directResult && directResult.decks && directResult.decks.length > 0) {
+          saveStoredMetaDecks(directResult);
           cachedMetaResponse = { data: directResult, timestamp: Date.now() };
           return directResult;
         }
@@ -287,7 +342,14 @@ export async function fetchLiveMetaDecks(forceRefresh = true): Promise<Limitless
         console.warn('Conexão direta com Limitless falhou ou offline:', directErr);
       }
 
-      // Fallback seguro de emergência caso haja bloqueio de rede ou falta de conexão
+      // Se as chamadas externas falharem, recupera o último estado salvo localmente no localStorage
+      const localCached = getStoredMetaDecks();
+      if (localCached && localCached.decks.length > 0) {
+        console.info('Utilizando último estado do metagame salvo localmente no navegador (localStorage).');
+        return localCached;
+      }
+
+      // Fallback seguro de emergência caso não haja conexão nem dados prévios em cache
       const fallbackResponse: LimitlessApiResponse = {
         decks: fallbackMetaDecks,
         tournamentName: 'Pokémon World Championships (Modo Offline de Contingência)',

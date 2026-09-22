@@ -23,7 +23,7 @@ import PokemonSprite from './PokemonSprite';
 import PokemonLoader from './PokemonLoader';
 import { getArchetypeSprites } from './Matches';
 import { fallbackMetaDecks } from '../data/fallbackDecks';
-import { fetchLiveMetaDecks } from '../services/limitlessApi';
+import { fetchLiveMetaDecks, getStoredMetaDecks } from '../services/limitlessApi';
 import { normalizePokemonCard, parsePTCGLDeckList, getPTCGLId } from '../services/cardNormalizationService';
 
 function detectPokemonsFromDeckText(text: string): { p1?: string; p2?: string } {
@@ -84,10 +84,16 @@ export default function Decks({ currentMember }: DecksProps) {
 
   // Sub-tabs: 'my' = Meus Decks, 'meta' = Limitless Meta Decks
   const [activeTab, setActiveTab] = useState<'my' | 'meta'>('my');
-  const [metaDecks, setMetaDecks] = useState<any[]>([]);
+  const [metaDecks, setMetaDecks] = useState<any[]>(() => {
+    const cached = getStoredMetaDecks();
+    return cached?.decks || [];
+  });
   const [loadingMeta, setLoadingMeta] = useState(false);
   const [copiedDeckId, setCopiedDeckId] = useState<string | null>(null);
-  const [tournamentName, setTournamentName] = useState('Carregando...');
+  const [tournamentName, setTournamentName] = useState(() => {
+    const cached = getStoredMetaDecks();
+    return cached?.tournamentName || 'Carregando...';
+  });
 
   // Import & Edit Deck State
   const [showImportModal, setShowImportModal] = useState(false);
@@ -100,9 +106,18 @@ export default function Decks({ currentMember }: DecksProps) {
 
   // Active Deck Detail view
   const [activeDeck, setActiveDeck] = useState<DeckRecord | null>(null);
-  const [metaSource, setMetaSource] = useState<'api-server' | 'api-direct-limitless' | 'offline-fallback'>('api-server');
-  const [metaTournamentDate, setMetaTournamentDate] = useState<string>('');
-  const [metaPlayersCount, setMetaPlayersCount] = useState<number | undefined>(undefined);
+  const [metaSource, setMetaSource] = useState<'api-server' | 'api-direct-limitless' | 'offline-fallback' | 'local-storage-cache'>(() => {
+    const cached = getStoredMetaDecks();
+    return cached ? 'local-storage-cache' : 'api-server';
+  });
+  const [metaTournamentDate, setMetaTournamentDate] = useState<string>(() => {
+    const cached = getStoredMetaDecks();
+    return cached?.tournamentDate || '';
+  });
+  const [metaPlayersCount, setMetaPlayersCount] = useState<number | undefined>(() => {
+    const cached = getStoredMetaDecks();
+    return cached?.playersCount;
+  });
 
   useEffect(() => {
     async function loadDecks() {
@@ -142,6 +157,15 @@ export default function Decks({ currentMember }: DecksProps) {
       if (result.playersCount) setMetaPlayersCount(result.playersCount);
     } catch (err) {
       console.error('Erro ao carregar meta decks:', err);
+      // Fallback para último estado salvo em localStorage caso ocorra exceção
+      const cached = getStoredMetaDecks();
+      if (cached && cached.decks.length > 0) {
+        setMetaDecks(cached.decks);
+        setTournamentName(cached.tournamentName);
+        setMetaSource('local-storage-cache');
+        if (cached.tournamentDate) setMetaTournamentDate(cached.tournamentDate);
+        if (cached.playersCount) setMetaPlayersCount(cached.playersCount);
+      }
     } finally {
       setLoadingMeta(false);
     }
@@ -751,6 +775,10 @@ export default function Decks({ currentMember }: DecksProps) {
                   {metaSource === 'offline-fallback' ? (
                     <span className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/30 text-[10px] font-bold text-amber-400 rounded-md font-mono flex items-center gap-1">
                       ⚠️ Modo Contingência
+                    </span>
+                  ) : metaSource === 'local-storage-cache' ? (
+                    <span className="px-2 py-0.5 bg-sky-500/10 border border-sky-500/30 text-[10px] font-bold text-sky-400 rounded-md font-mono flex items-center gap-1">
+                      💾 Cache Local Seguro (Salvo)
                     </span>
                   ) : metaSource === 'api-direct-limitless' ? (
                     <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-bold text-emerald-400 rounded-md font-mono flex items-center gap-1">
