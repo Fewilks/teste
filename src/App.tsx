@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Member } from './types';
-import { db, seedDatabaseIfEmpty, membersCol, collectionCol, auth } from './lib/firebase';
+import { db, seedDatabaseIfEmpty, seedTournamentsIfEmpty, membersCol, collectionCol, auth } from './lib/firebase';
 import { getDocs, getDoc, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { registerCollectionCards } from './utils/cardImages';
@@ -10,6 +10,7 @@ import Collection from './components/Collection';
 import Loans from './components/Loans';
 import Matches from './components/Matches';
 import Decks from './components/Decks';
+import Tournaments from './components/Tournaments';
 import TeamMembers from './components/TeamMembers';
 import MyProfile from './components/MyProfile';
 import RoleLock from './components/RoleLock';
@@ -25,7 +26,9 @@ import {
   HelpCircle,
   User,
   Lock,
-  FileText
+  FileText,
+  CalendarDays,
+  Flame
 } from 'lucide-react';
 import PokemonSprite from './components/PokemonSprite';
 import PokemonLoader from './components/PokemonLoader';
@@ -56,6 +59,7 @@ export default function App() {
     try {
       // Seed Firestore with rich demo data if empty
       await seedDatabaseIfEmpty();
+      await seedTournamentsIfEmpty();
 
       // Retrieve Spirits roster
       const snap = await getDocs(membersCol);
@@ -242,11 +246,12 @@ export default function App() {
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, minRank: 1 },
+    { id: 'campeonatos', label: 'Campeonatos', icon: Trophy, minRank: 1 },
     { id: 'partidas', label: 'Partidas & Winrate', icon: Swords, minRank: 1 },
     { id: 'trainerlog', label: 'TrainerLog Replay', icon: FileText, minRank: 1 },
     { id: 'colecao', label: 'Minha Coleção', icon: Layers, minRank: 1 },
     { id: 'emprestimos', label: 'Empréstimos', icon: ArrowLeftRight, minRank: 1 },
-    { id: 'decks', label: 'Meus Decks', icon: Trophy, minRank: 1 },
+    { id: 'decks', label: 'Meus Decks', icon: Sparkles, minRank: 1 },
     { id: 'perfil', label: 'Meu Perfil', icon: User, minRank: 1 },
     { id: 'time', label: 'Time Spirits', icon: Users, minRank: 1 },
   ];
@@ -357,6 +362,8 @@ export default function App() {
                 onStatsHealed={() => loadPortalData(currentUser?.uid)} 
               />
             )}
+            
+            {activeTab === 'campeonatos' && <Tournaments currentMember={currentMember} />}
             
             {activeTab === 'colecao' && <Collection currentMember={currentMember} />}
             

@@ -124,6 +124,38 @@
         "turns": { "type": "array", "description": "Turn-by-turn snapshots" }
       },
       "required": ["id", "userId", "player1Name", "player2Name", "playerDeckArchetype", "opponentDeckArchetype", "result", "wentFirst", "totalTurns", "date", "rawLog"]
+    },
+    "Tournament": {
+      "title": "Tournament",
+      "description": "Represents an upcoming or past Pokemon TCG tournament in nearby cities",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique tournament ID" },
+        "name": { "type": "string", "description": "Title/name of the championship" },
+        "storeName": { "type": "string", "description": "Name of the host store" },
+        "city": { "type": "string", "description": "City where the event will take place" },
+        "state": { "type": "string", "description": "State/UF acronym" },
+        "address": { "type": "string", "description": "Physical street address" },
+        "date": { "type": "string", "description": "Tournament date (YYYY-MM-DD)" },
+        "time": { "type": "string", "description": "Tournament start time (HH:MM)" },
+        "format": { "type": "string", "description": "TCG format (Standard, Expanded, etc.)" },
+        "tier": { "type": "string", "description": "Tier (Desafio de Liga, Copa de Liga, Regional, etc.)" },
+        "entryFee": { "type": "string", "description": "Registration cost or fee description" },
+        "prizes": { "type": "string", "description": "Prizes description" },
+        "websiteUrl": { "type": "string", "description": "Official store website or event link" },
+        "instagramUrl": { "type": "string", "description": "Store Instagram profile link or handle" },
+        "registrationUrl": { "type": "string", "description": "Reservation or direct registration link" },
+        "reservationNotes": { "type": "string", "description": "Important reservation notes and instructions" },
+        "maxSpots": { "type": "integer", "description": "Maximum player spots available" },
+        "spotsStatus": { "type": "string", "enum": ["open", "limited", "soldout", "ended"], "description": "Spots availability status" },
+        "confirmedMemberIds": { "type": "array", "description": "List of Spirits team member UIDs attending" },
+        "confirmedMemberNames": { "type": "array", "description": "List of Spirits team member names attending" },
+        "notes": { "type": "string", "description": "Decklist requirements, rules, schedule details" },
+        "createdById": { "type": "string", "description": "Member UID who created the record" },
+        "createdByName": { "type": "string", "description": "Member name who created the record" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["id", "name", "storeName", "city", "date", "format", "createdAt"]
     }
   },
   "firestore": {
@@ -150,6 +182,10 @@
     "trainer_logs/{logId}": {
       "schema": "TrainerLog",
       "description": "Imported Pokémon TCG Live battle logs and replays"
+    },
+    "tournaments/{tournamentId}": {
+      "schema": "Tournament",
+      "description": "Championships and tournaments in nearby cities with reservations and countdown alerts"
     }
   }
 }

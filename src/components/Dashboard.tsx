@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { db, membersCol, matchesCol, loansCol } from '../lib/firebase';
+import { db, membersCol, matchesCol, loansCol, tournamentsCol, seedTournamentsIfEmpty } from '../lib/firebase';
 import { getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { Member, MatchRecord, LoanRecord } from '../types';
+import { Member, MatchRecord, LoanRecord, Tournament } from '../types';
 import PokemonSprite from './PokemonSprite';
 import PokemonLoader from './PokemonLoader';
 import RecentPerformanceWidget from './RecentPerformanceWidget';
@@ -14,15 +14,18 @@ import {
   ArrowLeftRight, 
   CheckCircle2, 
   Flame, 
-  Sparkles,
-  Calendar,
-  Layers,
-  FileText,
-  Play,
-  TrendingUp,
-  UserCheck,
-  Award,
-  Zap
+  Sparkles, 
+  Calendar, 
+  Layers, 
+  FileText, 
+  Play, 
+  TrendingUp, 
+  UserCheck, 
+  Award, 
+  Zap,
+  Store,
+  MapPin,
+  Ticket
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -35,6 +38,7 @@ export default function Dashboard({ currentMember, setActiveTab, onStatsHealed }
   const [members, setMembers] = useState<Member[]>([]);
   const [allMatches, setAllMatches] = useState<MatchRecord[]>([]);
   const [pendingLoans, setPendingLoans] = useState<LoanRecord[]>([]);
+  const [upcomingTournaments, setUpcomingTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [matchViewFilter, setMatchViewFilter] = useState<'all' | 'mine'>('mine');
 
@@ -124,6 +128,17 @@ export default function Dashboard({ currentMember, setActiveTab, onStatsHealed }
           (l.ownerId === currentMember.id || l.borrowerId === currentMember.id) && l.status === 'pending'
         );
         setPendingLoans(relevantLoans);
+
+        // 4. Fetch upcoming tournaments
+        try {
+          await seedTournamentsIfEmpty();
+          const tournsSnap = await getDocs(tournamentsCol);
+          const tournsList = tournsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Tournament));
+          tournsList.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+          setUpcomingTournaments(tournsList);
+        } catch (tErr) {
+          console.error('Error fetching tournaments in dashboard:', tErr);
+        }
 
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
@@ -270,6 +285,15 @@ export default function Dashboard({ currentMember, setActiveTab, onStatsHealed }
                 <FileText className="w-3.5 h-3.5 text-purple-400" />
                 <span>Abrir TrainerLog Replay</span>
               </button>
+
+              <button
+                id="btn-quick-tournaments"
+                onClick={() => setActiveTab('campeonatos')}
+                className="px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-amber-950/30 cursor-pointer"
+              >
+                <Trophy className="w-3.5 h-3.5 text-amber-300" />
+                <span>Campeonatos & Vagas ({upcomingTournaments.length})</span>
+              </button>
             </div>
           </div>
           
@@ -291,6 +315,65 @@ export default function Dashboard({ currentMember, setActiveTab, onStatsHealed }
           </div>
         </div>
       </div>
+
+      {/* Widget: Campeonatos Chegando nas Cidades Próximas */}
+      {upcomingTournaments.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-950/40 via-slate-900/90 to-purple-950/40 border border-amber-500/30 p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="p-3 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/30 shrink-0">
+              <Flame className="w-5 h-5 text-amber-400 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                  🚨 Próximo Campeonato Chegando!
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                  {upcomingTournaments.length} eventos cadastrados
+                </span>
+              </div>
+              <h4 className="text-sm sm:text-base font-bold text-white mt-0.5">
+                {upcomingTournaments[0].name}
+              </h4>
+              <p className="text-xs text-slate-350 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="text-amber-300 font-semibold flex items-center gap-1">
+                  <Store className="w-3.5 h-3.5 text-amber-400" />
+                  {upcomingTournaments[0].storeName} ({upcomingTournaments[0].city})
+                </span>
+                <span className="text-purple-300 flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                  {upcomingTournaments[0].date} às {upcomingTournaments[0].time || '14:00'}
+                </span>
+                {upcomingTournaments[0].reservationNotes && (
+                  <span className="text-amber-200/90">
+                    • {upcomingTournaments[0].reservationNotes}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {upcomingTournaments[0].registrationUrl && (
+              <a
+                href={upcomingTournaments[0].registrationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950/40 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Ticket className="w-3.5 h-3.5" />
+                <span>Fazer Reserva</span>
+              </a>
+            )}
+            <button
+              onClick={() => setActiveTab('campeonatos')}
+              className="px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-amber-950/40 cursor-pointer flex items-center gap-1.5"
+            >
+              <span>Ver Todos</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 2. Personal Performance Bento Grid (Foco nos seus dados) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="personal-stats-grid">

@@ -165,3 +165,41 @@ export interface TrainerLogMatch {
   notes?: string;
   syncedToMatches?: boolean;
 }
+
+export type TournamentTier = 
+  | 'Desafio de Liga'
+  | 'Copa de Liga'
+  | 'Regional'
+  | 'Special Event'
+  | 'Prerelease'
+  | 'Torneio Local'
+  | 'Outro';
+
+export type TournamentSpotsStatus = 'open' | 'limited' | 'soldout' | 'ended';
+
+export interface Tournament {
+  id: string;
+  name: string;
+  storeName: string;
+  city: string;
+  state?: string;
+  address?: string;
+  date: string; // YYYY-MM-DD
+  time?: string; // HH:MM
+  format: string; // 'Standard', 'Expanded', 'Selado', etc.
+  tier?: TournamentTier | string;
+  entryFee?: string; // e.g. "R$ 35,00"
+  prizes?: string; // e.g. "Boosters + Championship Points (CP)"
+  websiteUrl?: string; // Link da loja / evento
+  instagramUrl?: string; // Link do Instagram da loja (@loja ou https://instagram.com/loja)
+  registrationUrl?: string; // Link direto para inscrição / WhatsApp / RK9
+  reservationNotes?: string; // e.g. "Faça sua reserva! Vagas limitadas no WhatsApp"
+  maxSpots?: number; // e.g. 32
+  spotsStatus?: TournamentSpotsStatus;
+  confirmedMemberIds?: string[]; // IDs dos membros do Spirits confirmados
+  confirmedMemberNames?: string[]; // Nomes dos membros confirmados
+  notes?: string; // Decklist obrigatória, regras, orientações
+  createdById?: string;
+  createdByName?: string;
+  createdAt: string;
+}
