@@ -62,6 +62,13 @@ export interface MatchRecord {
   score: string; // e.g. "2-1", "1-0"
   playedAt: string;
   notes?: string;
+  // Torneio associado (se aplicável)
+  tournamentId?: string;
+  tournamentName?: string;
+  // Detalhes da Melhor de Três (MD3)
+  round1?: 'win' | 'loss' | 'draw';
+  round2?: 'win' | 'loss' | 'draw';
+  round3?: 'win' | 'loss' | 'draw' | 'not_played';
 }
 
 export interface ParsedDeckCard {

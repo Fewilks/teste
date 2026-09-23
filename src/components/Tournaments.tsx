@@ -388,6 +388,13 @@ export default function Tournaments({ currentMember }: TournamentsProps) {
         createdAt: editingTournament?.createdAt || new Date().toISOString()
       };
 
+      // Remove undefined properties to prevent Firestore serialization errors
+      Object.keys(tournamentData).forEach(k => {
+        if ((tournamentData as any)[k] === undefined) {
+          delete (tournamentData as any)[k];
+        }
+      });
+
       await setDoc(doc(db, 'tournaments', id), tournamentData);
       setIsModalOpen(false);
     } catch (err) {

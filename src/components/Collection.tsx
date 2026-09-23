@@ -329,11 +329,11 @@ export default function Collection({ currentMember }: CollectionProps) {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6" id="collection-grid">
-          {collectionCards.map(card => (
+          {collectionCards.map((card, idx) => (
             <div 
-              key={card.id} 
+              key={`collection-item-${card.id || 'card'}-${card.ownerId || 'anon'}-${idx}`} 
               className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden hover:border-purple-500/30 hover:shadow-[0_0_15px_rgba(147,51,234,0.05)] transition-all duration-300 group flex flex-col justify-between backdrop-blur-md"
-              id={`collection-card-${card.id}`}
+              id={`collection-card-${card.id || idx}`}
             >
               {/* Card visual wrapper */}
               <div className="p-3 relative aspect-[3/4] flex items-center justify-center bg-slate-950/20">
@@ -499,9 +499,9 @@ export default function Collection({ currentMember }: CollectionProps) {
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 focus:border-purple-500 rounded-lg text-white text-sm outline-none font-sans cursor-pointer"
                   >
                     <option value="">Todas as Coleções</option>
-                    {sets.map((s: any) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.id.toUpperCase()})
+                    {sets.map((s: any, idx: number) => (
+                      <option key={`set-opt-${s.id || 'set'}-${idx}`} value={s.id}>
+                        {s.name} ({s.id ? String(s.id).toUpperCase() : ''})
                       </option>
                     ))}
                   </select>
@@ -630,12 +630,12 @@ export default function Collection({ currentMember }: CollectionProps) {
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4" id="modal-search-results">
-                      {searchResults.map((card) => (
+                      {searchResults.map((card, idx) => (
                         <div
-                          key={card.id}
+                          key={`search-card-${card.id || 'search'}-${idx}`}
                           onClick={() => handleOpenAdd(card)}
                           className="bg-slate-950/60 hover:bg-slate-950 p-2.5 rounded-xl border border-slate-850 hover:border-purple-500/50 cursor-pointer transition-all duration-300 group flex flex-col justify-between"
-                          id={`search-result-${card.id}`}
+                          id={`search-result-${card.id || idx}`}
                         >
                           <div className="aspect-[3/4] flex items-center justify-center relative mb-2">
                             <img 

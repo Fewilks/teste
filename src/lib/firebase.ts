@@ -26,49 +26,14 @@ export const decksCol = collection(db, 'decks');
 export const trainerLogsCol = collection(db, 'trainer_logs');
 export const tournamentsCol = collection(db, 'tournaments');
 
-// Sincroniza apenas o torneio oficial confirmado pelo usuário e limpa torneios de exemplo
-export async function seedTournamentsIfEmpty(forceRefresh = false) {
+// Limpeza segura de dados de teste antigos, mantendo todos os campeonatos 100% manuais
+export async function seedTournamentsIfEmpty(_force?: boolean) {
   try {
     const snap = await getDocs(tournamentsCol);
-    
-    // Remove qualquer torneio anterior criado como exemplo pelo sistema
     for (const d of snap.docs) {
-      if (d.data().createdById === 'system' || (d.id.startsWith('tourn-') && d.id !== 'tourn-madcat-bauru')) {
+      if (d.data().createdById === 'system') {
         await deleteDoc(doc(db, 'tournaments', d.id));
       }
-    }
-
-    // Torneio oficial confirmado pelo usuário na MadCat Bauru
-    const madCatTournament: Tournament = {
-      id: 'tourn-madcat-bauru',
-      name: 'Campeonato Pokémon TCG - MadCat Bauru',
-      storeName: 'MadCat Bauru',
-      city: 'Bauru',
-      state: 'SP',
-      address: 'Rua Vereador Joaquim da Silva Martha, 680, Bauru - SP (CEP 17014-010)',
-      date: '2026-09-27', // Domingo, dia 27
-      time: '10:00', // Início às 10h da manhã
-      format: 'Standard (Padrão)',
-      tier: 'Copa de Liga',
-      entryFee: 'R$ 60,00', // Inscrição R$ 60,00
-      prizes: 'Championship Points (CP) + Premiação Play! Pokémon oficial',
-      websiteUrl: 'https://www.instagram.com/madcatbauru/',
-      instagramUrl: 'https://www.instagram.com/madcatbauru/',
-      registrationUrl: 'https://www.instagram.com/madcatbauru/',
-      reservationNotes: '🚨 CAMPEONATO NO DIA 27 ÀS 10H DA MANHÃ (Inscrição: R$ 60,00). Faça a sua reserva antecipada via Instagram @madcatbauru!',
-      maxSpots: 32,
-      spotsStatus: 'open',
-      confirmedMemberIds: [],
-      confirmedMemberNames: [],
-      notes: 'Campeonato oficial na MadCat Bauru (Rua Vereador Joaquim da Silva Martha, 680, Bauru 17014010). Início pontual às 10:00.',
-      createdById: 'manual',
-      createdByName: 'Administrador',
-      createdAt: new Date().toISOString()
-    };
-
-    const madCatDoc = await getDoc(doc(db, 'tournaments', 'tourn-madcat-bauru'));
-    if (!madCatDoc.exists() || forceRefresh || madCatDoc.data()?.date !== '2026-09-27' || madCatDoc.data()?.time !== '10:00' || madCatDoc.data()?.entryFee !== 'R$ 60,00') {
-      await setDoc(doc(db, 'tournaments', 'tourn-madcat-bauru'), madCatTournament);
     }
   } catch (error) {
     console.error('Error in seedTournamentsIfEmpty:', error);

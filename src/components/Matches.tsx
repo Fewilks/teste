@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { db, matchesCol, membersCol, decksCol } from '../lib/firebase';
+import { db, matchesCol, membersCol, decksCol, tournamentsCol } from '../lib/firebase';
 import { getDocs, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { Member, MatchRecord, DeckRecord } from '../types';
+import { Member, MatchRecord, DeckRecord, Tournament } from '../types';
 import { 
   Swords, 
   Calendar, 
@@ -13,7 +13,8 @@ import {
   TrendingUp,
   FileText,
   Play,
-  RotateCcw
+  RotateCcw,
+  Trophy
 } from 'lucide-react';
 import PokemonSprite from './PokemonSprite';
 import PokemonLoader from './PokemonLoader';
@@ -53,6 +54,7 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
   const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [allDecks, setAllDecks] = useState<DeckRecord[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMatches, setSelectedMatches] = useState<string[]>([]);
   const [showOnlyMine, setShowOnlyMine] = useState<boolean>(false);
@@ -61,6 +63,7 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
   // Filter conditions
   const [filterResult, setFilterResult] = useState<string>('all');
   const [filterFormat, setFilterFormat] = useState<string>('all');
+  const [filterTournament, setFilterTournament] = useState<string>('all');
 
   // Register Form State
   const [showFormModal, setShowFormModal] = useState(false);
@@ -76,9 +79,18 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
   const [opponentDeck, setOpponentDeck] = useState('');
   const [format, setFormat] = useState<'MD1' | 'MD3' | 'MD5'>('MD3');
   const [result, setResult] = useState<'win' | 'loss' | 'draw'>('win');
-  const [score, setScore] = useState('2-1');
+  const [score, setScore] = useState('2-0');
   const [notes, setNotes] = useState('');
   const [registering, setRegistering] = useState(false);
+
+  // Tournament selector state for the form
+  const [selectedTournamentId, setSelectedTournamentId] = useState<string>('');
+  const [customTournamentName, setCustomTournamentName] = useState<string>('');
+
+  // MD3 Game by Game state (Rodada 1, Rodada 2, Rodada 3)
+  const [round1, setRound1] = useState<'win' | 'loss' | 'draw'>('win');
+  const [round2, setRound2] = useState<'win' | 'loss' | 'draw'>('win');
+  const [round3, setRound3] = useState<'win' | 'loss' | 'draw' | 'not_played'>('not_played');
 
   const archetypes = [
     'Charizard ex',
@@ -116,12 +128,77 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
       const deckSnap = await getDocs(decksCol);
       const deckList = deckSnap.docs.map(d => ({ id: d.id, ...d.data() } as DeckRecord));
       setAllDecks(deckList);
+
+      // Load all registered tournaments for match linking and filtering
+      const tournsSnap = await getDocs(tournamentsCol);
+      const tournsList = tournsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Tournament));
+      tournsList.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      setTournaments(tournsList);
     } catch (err) {
       console.error('Error loading matches:', err);
     } finally {
       setLoading(false);
     }
   }
+
+  // Recalcula o placar e o resultado da MD3 automaticamente com base nas 3 rodadas
+  const applyMD3State = (
+    r1: 'win' | 'loss' | 'draw',
+    r2: 'win' | 'loss' | 'draw',
+    r3: 'win' | 'loss' | 'draw' | 'not_played'
+  ) => {
+    let w = 0;
+    let l = 0;
+    let d = 0;
+
+    if (r1 === 'win') w++; else if (r1 === 'loss') l++; else d++;
+    if (r2 === 'win') w++; else if (r2 === 'loss') l++; else d++;
+    if (r3 !== 'not_played') {
+      if (r3 === 'win') w++; else if (r3 === 'loss') l++; else d++;
+    }
+
+    const calculatedScore = `${w}-${l}${d > 0 ? ` (${d}E)` : ''}`;
+    let calculatedRes: 'win' | 'loss' | 'draw' = 'draw';
+    if (w > l) calculatedRes = 'win';
+    else if (l > w) calculatedRes = 'loss';
+    else calculatedRes = 'draw';
+
+    setScore(calculatedScore);
+    setResult(calculatedRes);
+  };
+
+  const handleSetRound1 = (val: 'win' | 'loss' | 'draw') => {
+    setRound1(val);
+    let nextR3 = round3;
+    if (val === 'win' && round2 === 'win') {
+      nextR3 = 'not_played';
+    } else if (val === 'loss' && round2 === 'loss') {
+      nextR3 = 'not_played';
+    } else if (nextR3 === 'not_played') {
+      nextR3 = 'win';
+    }
+    setRound3(nextR3);
+    applyMD3State(val, round2, nextR3);
+  };
+
+  const handleSetRound2 = (val: 'win' | 'loss' | 'draw') => {
+    setRound2(val);
+    let nextR3 = round3;
+    if (round1 === 'win' && val === 'win') {
+      nextR3 = 'not_played';
+    } else if (round1 === 'loss' && val === 'loss') {
+      nextR3 = 'not_played';
+    } else if (nextR3 === 'not_played') {
+      nextR3 = 'win';
+    }
+    setRound3(nextR3);
+    applyMD3State(round1, val, nextR3);
+  };
+
+  const handleSetRound3 = (val: 'win' | 'loss' | 'draw' | 'not_played') => {
+    setRound3(val);
+    applyMD3State(round1, round2, val);
+  };
 
   useEffect(() => {
     loadMatches();
@@ -247,12 +324,28 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
         ? deckArchetype
         : (deckPokemon2.trim() ? `${deckPokemon1.trim()} + ${deckPokemon2.trim()}` : deckPokemon1.trim() || 'Desconhecido');
 
-      const newMatch: Omit<MatchRecord, 'id'> = {
+      // Vínculo opcional com torneio cadastrado ou digitado
+      let matchTournamentId: string | undefined = undefined;
+      let matchTournamentName: string | undefined = undefined;
+
+      if (selectedTournamentId === 'custom') {
+        if (customTournamentName.trim()) {
+          matchTournamentName = customTournamentName.trim();
+        }
+      } else if (selectedTournamentId) {
+        const foundTourn = tournaments.find(t => t.id === selectedTournamentId);
+        if (foundTourn) {
+          matchTournamentId = foundTourn.id;
+          matchTournamentName = foundTourn.name;
+        }
+      }
+
+      const newMatchData: Record<string, any> = {
         player1Id: player1Id,
-        player1Name: p1Member.name,
-        player1Sprite: p1Member.avatarSprite,
+        player1Name: p1Member.name || 'Treinador Spirits',
+        player1Sprite: p1Member.avatarSprite || 'charizard',
         player2Name: player2IsMember ? (members.find(m => m.id === player2Id)?.name || player2Name) : player2Name,
-        player2IsMember: player2IsMember,
+        player2IsMember: !!player2IsMember,
         player2Id: (player2IsMember && player2Id) ? player2Id : '',
         deckName: deckName.trim(),
         deckArchetype: computedArchetype,
@@ -261,11 +354,28 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
         result: result,
         score: score.trim(),
         playedAt: new Date().toISOString(),
-        notes: notes.trim()
+        notes: notes.trim(),
+        round1: round1 || 'win',
+        round2: round2 || 'win',
+        round3: round3 || 'not_played'
       };
 
+      if (matchTournamentId) {
+        newMatchData.tournamentId = matchTournamentId;
+      }
+      if (matchTournamentName) {
+        newMatchData.tournamentName = matchTournamentName;
+      }
+
+      // Remove any keys that are undefined (Firestore addDoc throws if any field value is undefined)
+      Object.keys(newMatchData).forEach(key => {
+        if (newMatchData[key] === undefined) {
+          delete newMatchData[key];
+        }
+      });
+
       // 1. Add to Matches collection
-      const docRef = await addDoc(matchesCol, newMatch);
+      const docRef = await addDoc(matchesCol, newMatchData as Omit<MatchRecord, 'id'>);
 
       // 2. Increment wins/losses/draws for player 1
       const p1Ref = doc(db, 'members', player1Id);
@@ -299,7 +409,7 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
       }
 
       // Add to local state
-      setMatches(prev => [{ id: docRef.id, ...newMatch } as MatchRecord, ...prev]);
+      setMatches(prev => [{ id: docRef.id, ...newMatchData } as MatchRecord, ...prev]);
 
       // Reset form & Close modal
       setShowFormModal(false);
@@ -312,6 +422,13 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
       setDeckPokemon2('');
       setOpponentDeck('');
       setNotes('');
+      setSelectedTournamentId('');
+      setCustomTournamentName('');
+      setRound1('win');
+      setRound2('win');
+      setRound3('not_played');
+      setScore('2-0');
+      setResult('win');
       alert('Partida registrada com sucesso! O ranking do time foi atualizado.');
     } catch (err) {
       console.error('Error registering match:', err);
@@ -327,8 +444,34 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
       match.player1Id === currentMember.id || 
       (match.player2IsMember && match.player2Id === currentMember.id)
     );
-    return matchesResult && matchesFormat && matchesMine;
+    let matchesTourn = true;
+    if (filterTournament === 'all') {
+      matchesTourn = true;
+    } else if (filterTournament === 'none') {
+      matchesTourn = !match.tournamentId && !match.tournamentName;
+    } else {
+      matchesTourn = match.tournamentId === filterTournament || match.tournamentName === filterTournament;
+    }
+    return matchesResult && matchesFormat && matchesMine && matchesTourn;
   });
+
+  // Torneios únicos presentes nas partidas cadastradas além dos cadastrados
+  const matchTournamentNames = Array.from(
+    new Set(
+      matches
+        .map(m => m.tournamentName)
+        .filter((name): name is string => Boolean(name && !tournaments.some(t => t.name === name)))
+    )
+  );
+
+  const isTournamentFiltered = filterTournament !== 'all' && filterTournament !== 'none';
+  const currentFilteredTournamentName = tournaments.find(t => t.id === filterTournament)?.name || filterTournament;
+  const filteredWins = filteredMatches.filter(m => m.result === 'win').length;
+  const filteredLosses = filteredMatches.filter(m => m.result === 'loss').length;
+  const filteredDraws = filteredMatches.filter(m => m.result === 'draw').length;
+  const filteredWinrate = filteredMatches.length > 0
+    ? Math.round((filteredWins / filteredMatches.length) * 100)
+    : 0;
 
   return (
     <div className="space-y-6" id="matches-view">
@@ -422,6 +565,39 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
             </div>
             
             <div className="flex flex-wrap gap-3">
+              {/* Tournament Filter */}
+              <div className="flex items-center gap-1.5">
+                <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-xs text-slate-400">Campeonato:</span>
+                <select
+                  id="filter-tournament-select"
+                  value={filterTournament}
+                  onChange={(e) => setFilterTournament(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 text-white text-xs px-2.5 py-1 rounded-md outline-none max-w-[240px] truncate"
+                >
+                  <option value="all">🏆 Todos os Torneios & Treinos</option>
+                  <option value="none">🥊 Apenas Treinos Livres</option>
+                  {tournaments.length > 0 && (
+                    <optgroup label="Campeonatos Cadastrados">
+                      {tournaments.map(t => (
+                        <option key={t.id} value={t.id}>
+                          🏆 {t.name} ({t.city})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {matchTournamentNames.length > 0 && (
+                    <optgroup label="Outros Torneios">
+                      {matchTournamentNames.map((name, idx) => (
+                        <option key={idx} value={name}>
+                          🏆 {name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+
               {/* Result Filter */}
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-slate-400">Resultado:</span>
@@ -477,6 +653,43 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
               )}
             </div>
           </div>
+
+          {/* Tournament Summary Banner if Filtered by Tournament */}
+          {isTournamentFiltered && (
+            <div className="bg-gradient-to-r from-amber-500/10 via-purple-600/10 to-slate-900 border border-amber-500/30 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-lg animate-fade-in">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl shrink-0">
+                  <Trophy className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Filtro de Campeonato Ativo</div>
+                  <h3 className="text-base font-black text-white">{currentFilteredTournamentName}</h3>
+                  <p className="text-xs text-slate-400">
+                    Visualizando todas as partidas disputadas pelos membros da Spirits neste campeonato.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <div className="px-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-lg text-slate-300 font-mono">
+                  Total: <strong className="text-white">{filteredMatches.length}</strong> partidas
+                </div>
+                <div className="px-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-lg font-mono">
+                  <span className="text-emerald-400 font-bold">{filteredWins}V</span> - <span className="text-rose-400 font-bold">{filteredLosses}D</span> - <span className="text-slate-400">{filteredDraws}E</span>
+                </div>
+                <div className="px-3 py-1.5 bg-purple-950/40 border border-purple-500/30 rounded-lg text-purple-300 font-bold font-mono">
+                  Winrate: {filteredWinrate}%
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFilterTournament('all')}
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold cursor-pointer transition-all"
+                  title="Limpar filtro de campeonato"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Main List */}
           {loading ? (
@@ -578,21 +791,64 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
                   </div>
 
                   {/* Status details footer */}
-                  <div className="flex items-center justify-between border-t border-slate-850 pt-3 mt-4 text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[9px] ${
-                        match.result === 'win' ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/20' :
-                        match.result === 'loss' ? 'bg-rose-950 text-rose-400 border border-rose-500/20' :
-                        'bg-slate-800 text-slate-400'
-                      }`}>
-                        {match.result === 'win' ? 'Vitória' : match.result === 'loss' ? 'Derrota' : 'Empate'}
-                      </span>
-                      <span className="text-white font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-850 font-mono text-xs">{match.score}</span>
-                    </div>
+                  <div className="border-t border-slate-850 pt-3 mt-4 space-y-2">
+                    {/* Optional Tournament Badge */}
+                    {match.tournamentName && (
+                      <div className="flex items-center gap-1.5 pb-1">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                          <Trophy className="w-3 h-3 text-amber-400" />
+                          <span className="truncate">{match.tournamentName}</span>
+                        </span>
+                      </div>
+                    )}
 
-                    <div className="text-slate-500 flex items-center gap-1 font-mono text-[10px]">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {new Date(match.playedAt).toLocaleDateString('pt-BR')} | {match.format}
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[9px] ${
+                          match.result === 'win' ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/20' :
+                          match.result === 'loss' ? 'bg-rose-950 text-rose-400 border border-rose-500/20' :
+                          'bg-slate-800 text-slate-400'
+                        }`}>
+                          {match.result === 'win' ? 'Vitória' : match.result === 'loss' ? 'Derrota' : 'Empate'}
+                        </span>
+                        <span className="text-white font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-850 font-mono text-xs">{match.score}</span>
+
+                        {/* MD3 Breakdown Pills */}
+                        {match.round1 && (
+                          <div className="flex items-center gap-1 font-mono text-[9px] ml-1">
+                            <span className={`px-1.5 py-0.2 rounded font-bold ${
+                              match.round1 === 'win' ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30' :
+                              match.round1 === 'loss' ? 'bg-rose-950/80 text-rose-400 border border-rose-500/30' :
+                              'bg-amber-950/80 text-amber-400 border border-amber-500/30'
+                            }`} title="Rodada 1">
+                              R1: {match.round1 === 'win' ? 'V' : match.round1 === 'loss' ? 'D' : 'E'}
+                            </span>
+                            {match.round2 && (
+                              <span className={`px-1.5 py-0.2 rounded font-bold ${
+                                match.round2 === 'win' ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30' :
+                                match.round2 === 'loss' ? 'bg-rose-950/80 text-rose-400 border border-rose-500/30' :
+                                'bg-amber-950/80 text-amber-400 border border-amber-500/30'
+                              }`} title="Rodada 2">
+                                R2: {match.round2 === 'win' ? 'V' : match.round2 === 'loss' ? 'D' : 'E'}
+                              </span>
+                            )}
+                            {match.round3 && match.round3 !== 'not_played' && (
+                              <span className={`px-1.5 py-0.2 rounded font-bold ${
+                                match.round3 === 'win' ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30' :
+                                match.round3 === 'loss' ? 'bg-rose-950/80 text-rose-400 border border-rose-500/30' :
+                                'bg-amber-950/80 text-amber-400 border border-amber-500/30'
+                              }`} title="Rodada 3">
+                                R3: {match.round3 === 'win' ? 'V' : match.round3 === 'loss' ? 'D' : 'E'}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="text-slate-500 flex items-center gap-1 font-mono text-[10px]">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {new Date(match.playedAt).toLocaleDateString('pt-BR')} | {match.format}
+                      </div>
                     </div>
                   </div>
 
@@ -624,6 +880,49 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
                 {/* Form */}
                 <form onSubmit={handleRegisterMatch} className="p-6 overflow-y-auto space-y-4 flex-1">
                   
+                  {/* Tournament / Event Selector */}
+                  <div className="space-y-1.5 bg-slate-950/50 p-3 rounded-xl border border-slate-850">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-slate-300 uppercase flex items-center gap-1.5">
+                        <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Campeonato / Torneio (Opcional):</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-mono">Filtre depois na lista</span>
+                    </div>
+
+                    <select
+                      id="modal-tournament-select"
+                      value={selectedTournamentId}
+                      onChange={(e) => setSelectedTournamentId(e.target.value)}
+                      className="w-full p-2.5 bg-slate-900 border border-slate-800 focus:border-purple-500 rounded-lg text-white text-sm outline-none font-medium"
+                    >
+                      <option value="">🥊 Sem Torneio (Treino Livre / Partida Amistosa)</option>
+                      {tournaments.length > 0 && (
+                        <optgroup label="Campeonatos Cadastrados no Spirits">
+                          {tournaments.map(t => (
+                            <option key={t.id} value={t.id}>
+                              🏆 {t.name} - {t.storeName} ({t.city})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <option value="custom">✍️ Outro Campeonato (Digitar Manualmente...)</option>
+                    </select>
+
+                    {selectedTournamentId === 'custom' && (
+                      <div className="pt-2 animate-fade-in">
+                        <input
+                          type="text"
+                          placeholder="Nome do Campeonato (ex: League Cup Bauru - Spirits x MadCat)"
+                          value={customTournamentName}
+                          onChange={(e) => setCustomTournamentName(e.target.value)}
+                          className="w-full p-2.5 bg-slate-900 border border-amber-500/50 focus:border-amber-400 rounded-lg text-white text-sm outline-none placeholder:text-slate-500"
+                          required={selectedTournamentId === 'custom'}
+                        />
+                      </div>
+                    )}
+                  </div>
+
                   {/* Player 1 selection (Spirits member) */}
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-slate-300 uppercase">Representando Spirits (Jogador 1):</label>
@@ -817,47 +1116,176 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
                     />
                   </div>
 
-                  {/* Format, Result, Score */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-bold text-slate-300 uppercase">Formato:</label>
-                      <select
-                        id="match-format-select"
-                        value={format}
-                        onChange={(e) => setFormat(e.target.value as any)}
-                        className="w-full p-2 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none"
-                      >
-                        <option value="MD1">MD1</option>
-                        <option value="MD3">MD3</option>
-                        <option value="MD5">MD5</option>
-                      </select>
+                  {/* Melhor de Três (MD3) - Rodada 1, Rodada 2, Rodada 3 */}
+                  <div className="bg-slate-950/70 p-4 rounded-xl border border-purple-500/20 space-y-3.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-purple-300 uppercase tracking-wider">
+                          <span>⚔️</span>
+                          <span>Confronto MD3 (Melhor de Três Rodadas)</span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Informe quem venceu cada rodada da partida. O placar e o resultado são calculados automaticamente.
+                        </p>
+                      </div>
+
+                      {/* Live Computed Badge */}
+                      <div className={`px-2.5 py-1 rounded-lg font-mono text-xs font-black uppercase flex items-center gap-1.5 shadow-md ${
+                        result === 'win' ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' :
+                        result === 'loss' ? 'bg-rose-950 text-rose-300 border border-rose-500/40' :
+                        'bg-amber-950 text-amber-300 border border-amber-500/40'
+                      }`}>
+                        <span>{result === 'win' ? 'Vitória' : result === 'loss' ? 'Derrota' : 'Empate'}</span>
+                        <span className="text-white font-black bg-slate-950/80 px-1.5 py-0.5 rounded border border-slate-800">
+                          {score}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-bold text-slate-300 uppercase">Seu Resultado:</label>
-                      <select
-                        id="match-result-select"
-                        value={result}
-                        onChange={(e) => setResult(e.target.value as any)}
-                        className="w-full p-2 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none"
-                      >
-                        <option value="win">Vitória</option>
-                        <option value="loss">Derrota</option>
-                        <option value="draw">Empate</option>
-                      </select>
-                    </div>
+                    {/* Os 3 Locais com Rodada 1, Rodada 2, Rodada 3 */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      
+                      {/* Rodada 1 */}
+                      <div className="bg-slate-900/90 p-3 rounded-xl border border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                          <span>Rodada 1</span>
+                          <span className="text-[10px] text-slate-500 font-mono">Game 1</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleSetRound1('win')}
+                            className={`py-2 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer text-center ${
+                              round1 === 'win'
+                                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/40 ring-2 ring-emerald-400'
+                                : 'bg-slate-950 text-slate-400 hover:text-emerald-300 hover:bg-emerald-950/30'
+                            }`}
+                          >
+                            Venceu
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetRound1('loss')}
+                            className={`py-2 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer text-center ${
+                              round1 === 'loss'
+                                ? 'bg-rose-600 text-white shadow-md shadow-rose-900/40 ring-2 ring-rose-400'
+                                : 'bg-slate-950 text-slate-400 hover:text-rose-300 hover:bg-rose-950/30'
+                            }`}
+                          >
+                            Perdeu
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetRound1('draw')}
+                            className={`py-2 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer text-center ${
+                              round1 === 'draw'
+                                ? 'bg-amber-600 text-white shadow-md shadow-amber-900/40 ring-2 ring-amber-400'
+                                : 'bg-slate-950 text-slate-400 hover:text-amber-300 hover:bg-amber-950/30'
+                            }`}
+                          >
+                            Empatou
+                          </button>
+                        </div>
+                      </div>
 
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-bold text-slate-300 uppercase">Placar final:</label>
-                      <input
-                        id="match-score-input"
-                        type="text"
-                        placeholder="ex: 2-1"
-                        value={score}
-                        onChange={(e) => setScore(e.target.value)}
-                        className="w-full p-2 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none text-center font-mono"
-                        required
-                      />
+                      {/* Rodada 2 */}
+                      <div className="bg-slate-900/90 p-3 rounded-xl border border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                          <span>Rodada 2</span>
+                          <span className="text-[10px] text-slate-500 font-mono">Game 2</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleSetRound2('win')}
+                            className={`py-2 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer text-center ${
+                              round2 === 'win'
+                                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/40 ring-2 ring-emerald-400'
+                                : 'bg-slate-950 text-slate-400 hover:text-emerald-300 hover:bg-emerald-950/30'
+                            }`}
+                          >
+                            Venceu
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetRound2('loss')}
+                            className={`py-2 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer text-center ${
+                              round2 === 'loss'
+                                ? 'bg-rose-600 text-white shadow-md shadow-rose-900/40 ring-2 ring-rose-400'
+                                : 'bg-slate-950 text-slate-400 hover:text-rose-300 hover:bg-rose-950/30'
+                            }`}
+                          >
+                            Perdeu
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetRound2('draw')}
+                            className={`py-2 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer text-center ${
+                              round2 === 'draw'
+                                ? 'bg-amber-600 text-white shadow-md shadow-amber-900/40 ring-2 ring-amber-400'
+                                : 'bg-slate-950 text-slate-400 hover:text-amber-300 hover:bg-amber-950/30'
+                            }`}
+                          >
+                            Empatou
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Rodada 3 */}
+                      <div className="bg-slate-900/90 p-3 rounded-xl border border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                          <span>Rodada 3</span>
+                          <span className="text-[10px] text-slate-500 font-mono">Desempate</span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleSetRound3('win')}
+                            className={`py-2 px-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center ${
+                              round3 === 'win'
+                                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/40 ring-2 ring-emerald-400'
+                                : 'bg-slate-950 text-slate-400 hover:text-emerald-300 hover:bg-emerald-950/30'
+                            }`}
+                          >
+                            Venceu
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetRound3('loss')}
+                            className={`py-2 px-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center ${
+                              round3 === 'loss'
+                                ? 'bg-rose-600 text-white shadow-md shadow-rose-900/40 ring-2 ring-rose-400'
+                                : 'bg-slate-950 text-slate-400 hover:text-rose-300 hover:bg-rose-950/30'
+                            }`}
+                          >
+                            Perdeu
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetRound3('draw')}
+                            className={`py-2 px-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center ${
+                              round3 === 'draw'
+                                ? 'bg-amber-600 text-white shadow-md shadow-amber-900/40 ring-2 ring-amber-400'
+                                : 'bg-slate-950 text-slate-400 hover:text-amber-300 hover:bg-amber-950/30'
+                            }`}
+                          >
+                            Empatou
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetRound3('not_played')}
+                            className={`py-2 px-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer text-center ${
+                              round3 === 'not_played'
+                                ? 'bg-slate-700 text-white shadow-md ring-2 ring-slate-400'
+                                : 'bg-slate-950 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                            }`}
+                            title="Não houve necessidade (ex: 2-0 ou 0-2)"
+                          >
+                            Não Houve
+                          </button>
+                        </div>
+                      </div>
+
                     </div>
                   </div>
 
@@ -866,8 +1294,8 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
                     <label className="block text-xs font-bold text-slate-300 uppercase">Observações da Partida (Opcional):</label>
                     <textarea
                       id="match-notes-input"
-                      rows={3}
-                      placeholder="Comente sobre momentos importantes, tech cards cruciais, erros cometidos..."
+                      rows={2}
+                      placeholder="Comente sobre match-up, techs decisivas, premiações ou detalhes da partida..."
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       className="w-full p-2.5 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-xs outline-none"

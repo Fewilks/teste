@@ -248,8 +248,8 @@ export default function Decks({ currentMember }: DecksProps) {
       
       // Extrai os 2 Pokémon principais a partir da leitura da lista de cartas do baralho
       const detected = getTopTwoPokemons(metaDeck.rawList, metaDeck.cards, metaDeck.name);
-      const p1 = metaDeck.pokemon1 || detected.pokemon1;
-      const p2 = metaDeck.pokemon2 !== undefined ? metaDeck.pokemon2 : detected.pokemon2;
+      const p1 = metaDeck.pokemon1 || detected.pokemon1 || 'charizard';
+      const p2 = (metaDeck.pokemon2 !== undefined ? metaDeck.pokemon2 : detected.pokemon2) || '';
 
       const newDeck: Omit<DeckRecord, 'id'> = {
         userId: currentMember.id,
@@ -262,6 +262,13 @@ export default function Decks({ currentMember }: DecksProps) {
         parsedCards: normalizedCards,
         createdAt: new Date().toISOString()
       };
+
+      // Strip any undefined keys
+      Object.keys(newDeck).forEach(k => {
+        if ((newDeck as any)[k] === undefined) {
+          delete (newDeck as any)[k];
+        }
+      });
 
       const docRef = await addDoc(decksCol, newDeck);
       const importedRecord = { id: docRef.id, ...newDeck } as DeckRecord;
