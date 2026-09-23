@@ -388,19 +388,23 @@ export default function TeamMembers({ currentMember, setCurrentMember, onMemberU
                   </div>
                 </div>
 
-                {/* Score breakdown stats */}
-                <div className="grid grid-cols-3 gap-2 bg-slate-950/50 p-3 rounded-xl border border-slate-850/80 text-center">
+                {/* Score breakdown stats with Official CP */}
+                <div className="grid grid-cols-4 gap-1.5 bg-slate-950/50 p-2.5 rounded-xl border border-slate-850/80 text-center">
                   <div>
+                    <div className="text-[9px] text-amber-400 uppercase font-bold">Oficial CP</div>
+                    <div className="text-xs font-black text-amber-300 font-mono mt-0.5">{mem.officialPoints || 0} pts</div>
+                  </div>
+                  <div className="border-l border-slate-850">
                     <div className="text-[9px] text-slate-500 uppercase font-bold">Vitórias</div>
-                    <div className="text-sm font-extrabold text-emerald-400 font-mono mt-0.5">{mem.wins}</div>
+                    <div className="text-xs font-extrabold text-emerald-400 font-mono mt-0.5">{mem.wins}</div>
                   </div>
                   <div className="border-l border-slate-850">
                     <div className="text-[9px] text-slate-500 uppercase font-bold">Derrotas</div>
-                    <div className="text-sm font-extrabold text-rose-400 font-mono mt-0.5">{mem.losses}</div>
+                    <div className="text-xs font-extrabold text-rose-400 font-mono mt-0.5">{mem.losses}</div>
                   </div>
                   <div className="border-l border-slate-850">
                     <div className="text-[9px] text-slate-500 uppercase font-bold">Empates</div>
-                    <div className="text-sm font-extrabold text-slate-400 font-mono mt-0.5">{mem.draws}</div>
+                    <div className="text-xs font-extrabold text-slate-400 font-mono mt-0.5">{mem.draws}</div>
                   </div>
                 </div>
 

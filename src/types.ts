@@ -7,9 +7,39 @@ export interface Member {
   wins: number;
   losses: number;
   draws: number;
+  officialPoints?: number; // Championship Points (CP) acumulados na temporada oficial
   favoriteCard?: string;
   favoriteCardImage?: string;
   joinDate: string;
+}
+
+export interface ChampionshipPointRecord {
+  id: string;
+  memberId: string;
+  memberName: string;
+  avatarSprite?: string;
+  tournamentName: string;
+  tournamentTier: TournamentTier | string; // e.g. 'Copa de Liga', 'Desafio de Liga', 'Regional', 'Special Event'
+  placement: string; // '1º Lugar (Campeão)', '2º Lugar (Vice)', 'Top 4', 'Top 8', etc.
+  points: number; // e.g. 50, 15, 200, etc.
+  date: string; // YYYY-MM-DD
+  location?: string; // Loja / Cidade
+  deckArchetype?: string;
+  notes?: string;
+  createdAt: string;
+  createdById?: string;
+}
+
+export interface MonthlyGoals {
+  id: string; // e.g. "2026-09"
+  monthYear: string; // "2026-09"
+  targetTournaments: number; // ex: 6 torneios no mês
+  targetMatches: number; // ex: 30 partidas
+  targetWinRate: number; // ex: 60%
+  targetOfficialPoints: number; // ex: 100 pontos oficiais
+  notes?: string;
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 export interface CardItem {

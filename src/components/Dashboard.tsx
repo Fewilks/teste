@@ -5,6 +5,7 @@ import { Member, MatchRecord, LoanRecord, Tournament } from '../types';
 import PokemonSprite from './PokemonSprite';
 import PokemonLoader from './PokemonLoader';
 import RecentPerformanceWidget from './RecentPerformanceWidget';
+import MonthlyGoalsAndRanking from './MonthlyGoalsAndRanking';
 import { getRoleBadge } from '../utils';
 import { getArchetypeSprites } from './Matches';
 import { 
@@ -25,7 +26,8 @@ import {
   Zap,
   Store,
   MapPin,
-  Ticket
+  Ticket,
+  Crown
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -42,111 +44,111 @@ export default function Dashboard({ currentMember, setActiveTab, onStatsHealed }
   const [loading, setLoading] = useState(true);
   const [matchViewFilter, setMatchViewFilter] = useState<'all' | 'mine'>('mine');
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        
-        // 1. Fetch Members & clean test accounts
-        const memSnap = await getDocs(membersCol);
-        const memList = memSnap.docs.map(d => ({ id: d.id, ...d.data() } as Member));
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // 1. Fetch Members & clean test accounts
+      const memSnap = await getDocs(membersCol);
+      const memList = memSnap.docs.map(d => ({ id: d.id, ...d.data() } as Member));
 
-        const testNames = [
-          "Guilherme Silva",
-          "Thiago Pereira",
-          "Lucas Souza",
-          "Matheus Santos",
-          "Felipe Costa",
-          "Rafael Bastazini"
-        ];
-        const testNicknames = [
-          "SpiritsBoss",
-          "ThunderBolt",
-          "DeckBuilder",
-          "DrawPass",
-          "FireBlast",
-          "Shadow"
-        ];
+      const testNames = [
+        "Guilherme Silva",
+        "Thiago Pereira",
+        "Lucas Souza",
+        "Matheus Santos",
+        "Felipe Costa",
+        "Rafael Bastazini"
+      ];
+      const testNicknames = [
+        "SpiritsBoss",
+        "ThunderBolt",
+        "DeckBuilder",
+        "DrawPass",
+        "FireBlast",
+        "Shadow"
+      ];
 
-        const cleanMemList: Member[] = [];
-        for (const member of memList) {
-          const isTest = testNames.includes(member.name) || 
-                         (member.nickname && testNicknames.includes(member.nickname));
-          if (isTest) {
-            try {
-              await deleteDoc(doc(db, 'members', member.id));
-            } catch (e) {
-              console.error(`Failed to auto-delete test member ${member.name}:`, e);
-            }
-          } else {
-            cleanMemList.push(member);
+      const cleanMemList: Member[] = [];
+      for (const member of memList) {
+        const isTest = testNames.includes(member.name) || 
+                       (member.nickname && testNicknames.includes(member.nickname));
+        if (isTest) {
+          try {
+            await deleteDoc(doc(db, 'members', member.id));
+          } catch (e) {
+            console.error(`Failed to auto-delete test member ${member.name}:`, e);
           }
+        } else {
+          cleanMemList.push(member);
         }
+      }
 
-        // 2. Fetch All Matches
-        const allMatchesSnap = await getDocs(matchesCol);
-        const matchesList = allMatchesSnap.docs.map(d => ({ id: d.id, ...d.data() } as MatchRecord));
-        
-        // Sort all matches by playedAt descending
-        const sortedMatches = [...matchesList].sort((a, b) => new Date(b.playedAt).getTime() - new Date(a.playedAt).getTime());
-        setAllMatches(sortedMatches);
+      // 2. Fetch All Matches
+      const allMatchesSnap = await getDocs(matchesCol);
+      const matchesList = allMatchesSnap.docs.map(d => ({ id: d.id, ...d.data() } as MatchRecord));
+      
+      // Sort all matches by playedAt descending
+      const sortedMatches = [...matchesList].sort((a, b) => new Date(b.playedAt).getTime() - new Date(a.playedAt).getTime());
+      setAllMatches(sortedMatches);
 
-        // Recalculate member winrates dynamically based on matches
-        const computedMembers = cleanMemList.map(member => {
-          let wins = 0;
-          let losses = 0;
-          let draws = 0;
+      // Recalculate member winrates dynamically based on matches
+      const computedMembers = cleanMemList.map(member => {
+        let wins = 0;
+        let losses = 0;
+        let draws = 0;
 
-          sortedMatches.forEach(match => {
-            if (match.player1Id === member.id) {
-              if (match.result === 'win') wins++;
-              else if (match.result === 'loss') losses++;
-              else if (match.result === 'draw') draws++;
-            } else if (match.player2IsMember && match.player2Id === member.id) {
-              const p2Result = match.result === 'win' ? 'loss' : match.result === 'loss' ? 'win' : 'draw';
-              if (p2Result === 'win') wins++;
-              else if (p2Result === 'loss') losses++;
-              else if (p2Result === 'draw') draws++;
-            }
-          });
-
-          return {
-            ...member,
-            wins,
-            losses,
-            draws
-          };
+        sortedMatches.forEach(match => {
+          if (match.player1Id === member.id) {
+            if (match.result === 'win') wins++;
+            else if (match.result === 'loss') losses++;
+            else if (match.result === 'draw') draws++;
+          } else if (match.player2IsMember && match.player2Id === member.id) {
+            const p2Result = match.result === 'win' ? 'loss' : match.result === 'loss' ? 'win' : 'draw';
+            if (p2Result === 'win') wins++;
+            else if (p2Result === 'loss') losses++;
+            else if (p2Result === 'draw') draws++;
+          }
         });
 
-        computedMembers.sort((a, b) => b.wins - a.wins);
-        setMembers(computedMembers);
+        return {
+          ...member,
+          wins,
+          losses,
+          draws
+        };
+      });
 
-        // 3. Fetch Loans
-        const loanSnap = await getDocs(loansCol);
-        const loanList = loanSnap.docs.map(d => ({ id: d.id, ...d.data() } as LoanRecord));
-        const relevantLoans = loanList.filter(l => 
-          (l.ownerId === currentMember.id || l.borrowerId === currentMember.id) && l.status === 'pending'
-        );
-        setPendingLoans(relevantLoans);
+      computedMembers.sort((a, b) => b.wins - a.wins);
+      setMembers(computedMembers);
 
-        // 4. Fetch upcoming tournaments
-        try {
-          await seedTournamentsIfEmpty();
-          const tournsSnap = await getDocs(tournamentsCol);
-          const tournsList = tournsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Tournament));
-          tournsList.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-          setUpcomingTournaments(tournsList);
-        } catch (tErr) {
-          console.error('Error fetching tournaments in dashboard:', tErr);
-        }
+      // 3. Fetch Loans
+      const loanSnap = await getDocs(loansCol);
+      const loanList = loanSnap.docs.map(d => ({ id: d.id, ...d.data() } as LoanRecord));
+      const relevantLoans = loanList.filter(l => 
+        (l.ownerId === currentMember.id || l.borrowerId === currentMember.id) && l.status === 'pending'
+      );
+      setPendingLoans(relevantLoans);
 
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-      } finally {
-        setLoading(false);
+      // 4. Fetch upcoming tournaments
+      try {
+        await seedTournamentsIfEmpty();
+        const tournsSnap = await getDocs(tournamentsCol);
+        const tournsList = tournsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Tournament));
+        tournsList.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        setUpcomingTournaments(tournsList);
+      } catch (tErr) {
+        console.error('Error fetching tournaments in dashboard:', tErr);
       }
-    }
 
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, [currentMember]);
 
@@ -293,6 +295,18 @@ export default function Dashboard({ currentMember, setActiveTab, onStatsHealed }
               >
                 <Trophy className="w-3.5 h-3.5 text-amber-300" />
                 <span>Campeonatos & Vagas ({upcomingTournaments.length})</span>
+              </button>
+
+              <button
+                id="btn-quick-goals-ranking"
+                onClick={() => {
+                  const el = document.getElementById('monthly-goals-ranking-root');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-xl text-xs font-black flex items-center gap-2 transition-all shadow-md shadow-amber-950/30 cursor-pointer"
+              >
+                <Crown className="w-3.5 h-3.5 fill-current text-slate-950" />
+                <span>Metas & Ranking CP</span>
               </button>
             </div>
           </div>
@@ -466,7 +480,16 @@ export default function Dashboard({ currentMember, setActiveTab, onStatsHealed }
 
       </div>
 
-      {/* 3. Pending Loans Alert (se houver) */}
+      {/* 3. Metas Mensais & Ranking de Pontos Oficiais de Campeonatos (CP) */}
+      <MonthlyGoalsAndRanking
+        currentMember={currentMember}
+        allMatches={allMatches}
+        upcomingTournaments={upcomingTournaments}
+        onRefreshData={fetchData}
+        setActiveTab={setActiveTab}
+      />
+
+      {/* 4. Pending Loans Alert (se houver) */}
       {pendingLoans.length > 0 && (
         <div className="bg-slate-900/50 border border-amber-500/30 rounded-2xl p-5 shadow-lg backdrop-blur-md">
           <div className="flex items-center justify-between mb-4">

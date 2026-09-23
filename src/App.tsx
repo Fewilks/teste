@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Member } from './types';
-import { db, seedDatabaseIfEmpty, seedTournamentsIfEmpty, membersCol, collectionCol, auth } from './lib/firebase';
+import { 
+  db, 
+  seedDatabaseIfEmpty, 
+  seedTournamentsIfEmpty, 
+  purgeTestDataKeepCore, 
+  ensureInitialChampionshipData,
+  membersCol, 
+  collectionCol, 
+  auth 
+} from './lib/firebase';
 import { getDocs, getDoc, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { registerCollectionCards } from './utils/cardImages';
@@ -60,6 +69,13 @@ export default function App() {
       // Seed Firestore with rich demo data if empty
       await seedDatabaseIfEmpty();
       await seedTournamentsIfEmpty();
+      await ensureInitialChampionshipData();
+
+      // One-time automatic purge of test data (matches, tournaments, loans, logs), preserving decks, members, and collection
+      if (localStorage.getItem('spirits_data_purged_production_v2') !== 'true') {
+        await purgeTestDataKeepCore();
+        localStorage.setItem('spirits_data_purged_production_v2', 'true');
+      }
 
       // Retrieve Spirits roster
       const snap = await getDocs(membersCol);

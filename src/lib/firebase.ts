@@ -1,6 +1,7 @@
 import { 
   collection, 
   doc, 
+  getDoc,
   getDocs, 
   setDoc, 
   addDoc, 
@@ -12,7 +13,7 @@ import {
   limit,
   onSnapshot
 } from 'firebase/firestore';
-import { Member, CardItem, LoanRecord, MatchRecord, DeckRecord, Tournament } from '../types';
+import { Member, CardItem, LoanRecord, MatchRecord, DeckRecord, Tournament, ChampionshipPointRecord, MonthlyGoals } from '../types';
 import { db, auth } from './firebase-config';
 export { db, auth };
 
@@ -25,6 +26,8 @@ export const matchesCol = collection(db, 'matches');
 export const decksCol = collection(db, 'decks');
 export const trainerLogsCol = collection(db, 'trainer_logs');
 export const tournamentsCol = collection(db, 'tournaments');
+export const championshipPointsCol = collection(db, 'championship_points');
+export const monthlyGoalsCol = collection(db, 'monthly_goals');
 
 // Limpeza segura de dados de teste antigos, mantendo todos os campeonatos 100% manuais
 export async function seedTournamentsIfEmpty(_force?: boolean) {
@@ -155,36 +158,8 @@ export async function seedDatabaseIfEmpty() {
       await setDoc(doc(db, 'collection', c.id), c);
     }
 
-    // 3. Loans Seeding
-    const defaultLoans: LoanRecord[] = [
-      {
-        id: 'loan-1',
-        cardId: 'sv4-163',
-        cardName: 'Roaring Moon ex',
-        cardImageUrl: 'https://images.pokemontcg.io/sv4/163.png',
-        ownerId: 'member-2',
-        ownerName: 'Thiago Pereira',
-        borrowerId: 'member-4',
-        borrowerName: 'Matheus Santos',
-        quantity: 2,
-        status: 'active',
-        requestedAt: '2026-06-15T10:00:00Z',
-        loanedAt: '2026-06-15T14:30:00Z'
-      },
-      {
-        id: 'loan-2',
-        cardId: 'sv3-135',
-        cardName: 'Pidgeot ex',
-        cardImageUrl: 'https://images.pokemontcg.io/sv3/135.png',
-        ownerId: 'member-1',
-        ownerName: 'Guilherme Silva',
-        borrowerId: 'member-3',
-        borrowerName: 'Lucas Souza',
-        quantity: 1,
-        status: 'pending',
-        requestedAt: '2026-06-23T18:00:00Z'
-      }
-    ];
+    // 3. Loans Seeding (Empty list to start clean for production)
+    const defaultLoans: LoanRecord[] = [];
 
     for (const l of defaultLoans) {
       await setDoc(doc(db, 'loans', l.id), l);
@@ -254,6 +229,77 @@ Energia: 1
   }
 }
 
+// Purge all test data (matches, tournaments, loans, trainer logs), preserving decks, members, profiles and collection
+export async function purgeTestDataKeepCore(): Promise<{
+  deletedMatches: number;
+  deletedTournaments: number;
+  deletedLoans: number;
+  deletedLogs: number;
+}> {
+  let deletedMatches = 0;
+  let deletedTournaments = 0;
+  let deletedLoans = 0;
+  let deletedLogs = 0;
+
+  try {
+    // 1. Matches (Partidas de teste)
+    const matchesSnap = await getDocs(matchesCol);
+    for (const d of matchesSnap.docs) {
+      await deleteDoc(doc(db, 'matches', d.id));
+      deletedMatches++;
+    }
+
+    // 2. Tournaments (Campeonatos de teste)
+    const tournamentsSnap = await getDocs(tournamentsCol);
+    for (const d of tournamentsSnap.docs) {
+      await deleteDoc(doc(db, 'tournaments', d.id));
+      deletedTournaments++;
+    }
+
+    // 3. Loans (Empréstimos de teste)
+    const loansSnap = await getDocs(loansCol);
+    for (const d of loansSnap.docs) {
+      await deleteDoc(doc(db, 'loans', d.id));
+      deletedLoans++;
+    }
+
+    // 4. Trainer Logs (Replays/Logs do PTCGL de teste)
+    const logsSnap = await getDocs(trainerLogsCol);
+    for (const d of logsSnap.docs) {
+      await deleteDoc(doc(db, 'trainer_logs', d.id));
+      deletedLogs++;
+    }
+
+    // 5. Reset member match stats to 0 while keeping profiles, custom avatars, roles, favorite cards, and nicknames intact
+    const membersSnap = await getDocs(membersCol);
+    for (const d of membersSnap.docs) {
+      await updateDoc(doc(db, 'members', d.id), {
+        wins: 0,
+        losses: 0,
+        draws: 0
+      });
+    }
+
+    // 6. Reset any lent status on collection cards
+    const collSnap = await getDocs(collectionCol);
+    for (const d of collSnap.docs) {
+      const data = d.data();
+      if (data.lentToUserId || data.lentToUserName) {
+        await updateDoc(doc(db, 'collection', d.id), {
+          lentToUserId: null,
+          lentToUserName: null
+        });
+      }
+    }
+
+    console.log(`[Spirits Cleanup] Purge complete: ${deletedMatches} matches, ${deletedTournaments} tournaments, ${deletedLoans} loans, ${deletedLogs} logs cleared.`);
+  } catch (err) {
+    console.error('[Spirits Cleanup] Error during purge:', err);
+  }
+
+  return { deletedMatches, deletedTournaments, deletedLoans, deletedLogs };
+}
+
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
@@ -300,4 +346,135 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
+
+// --- CHAMPIONSHIP POINTS & MONTHLY GOALS HELPERS ---
+
+export async function addChampionshipPoints(data: Omit<ChampionshipPointRecord, 'id' | 'createdAt'>): Promise<string> {
+  const newDocRef = doc(championshipPointsCol);
+  const record: ChampionshipPointRecord = {
+    ...data,
+    id: newDocRef.id,
+    createdAt: new Date().toISOString()
+  };
+  await setDoc(newDocRef, record);
+
+  // Update member total points in member document
+  try {
+    const memRef = doc(db, 'members', data.memberId);
+    const memSnap = await getDoc(memRef);
+    if (memSnap.exists()) {
+      const currentPts = memSnap.data().officialPoints || 0;
+      await updateDoc(memRef, {
+        officialPoints: currentPts + data.points
+      });
+    }
+  } catch (err) {
+    console.error('Error updating member official points:', err);
+  }
+
+  return newDocRef.id;
+}
+
+export async function deleteChampionshipPointRecord(id: string, memberId: string, points: number): Promise<void> {
+  await deleteDoc(doc(db, 'championship_points', id));
+  try {
+    const memRef = doc(db, 'members', memberId);
+    const memSnap = await getDoc(memRef);
+    if (memSnap.exists()) {
+      const currentPts = memSnap.data().officialPoints || 0;
+      await updateDoc(memRef, {
+        officialPoints: Math.max(0, currentPts - points)
+      });
+    }
+  } catch (err) {
+    console.error('Error updating member points after deletion:', err);
+  }
+}
+
+export async function ensureInitialChampionshipData(): Promise<void> {
+  try {
+    // 1. Ensure Felipe Sausanavicius exists with Master Ball rank and 50 official points
+    const memSnap = await getDocs(membersCol);
+    const sausanavicius = memSnap.docs.find(d => {
+      const data = d.data();
+      return (data.name && data.name.toLowerCase().includes('sausanavicius')) || 
+             (data.nickname && data.nickname.toLowerCase().includes('sausanavicius'));
+    });
+
+    let sausanaviciusId = sausanavicius ? sausanavicius.id : 'member-felipe-sausanavicius';
+
+    if (!sausanavicius) {
+      const newMember: Member = {
+        id: sausanaviciusId,
+        name: 'Felipe Sausanavicius',
+        role: 'masterball',
+        nickname: 'Sausanavicius',
+        avatarSprite: 'charizard',
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        officialPoints: 50,
+        favoriteCard: 'Charizard ex',
+        favoriteCardImage: 'https://images.pokemontcg.io/sv3/125.png',
+        joinDate: '2025-02-15'
+      };
+      await setDoc(doc(db, 'members', sausanaviciusId), newMember);
+    } else {
+      const currentPts = sausanavicius.data().officialPoints;
+      if (currentPts === undefined || currentPts === 0) {
+        await updateDoc(doc(db, 'members', sausanavicius.id), {
+          officialPoints: 50
+        });
+      }
+    }
+
+    // 2. Ensure initial Championship Points record exists for the recent tournament win (50 CP)
+    const cpSnap = await getDocs(championshipPointsCol);
+    if (cpSnap.empty) {
+      const demoRecord: ChampionshipPointRecord = {
+        id: 'cp-sausanavicius-copa-1',
+        memberId: sausanaviciusId,
+        memberName: 'Felipe Sausanavicius',
+        avatarSprite: 'charizard',
+        tournamentName: 'Copa de Liga (League Cup)',
+        tournamentTier: 'Copa de Liga',
+        placement: '1º Lugar (Campeão)',
+        points: 50,
+        date: '2026-09-20',
+        location: 'São Paulo, SP',
+        deckArchetype: 'Charizard ex / Pidgeot ex',
+        notes: '🏆 Campeão da Copa de Liga no fim de semana! +50 Pontos Oficiais (CP) somados para o ranking de campeonatos.',
+        createdAt: new Date().toISOString(),
+        createdById: sausanaviciusId
+      };
+      await setDoc(doc(db, 'championship_points', demoRecord.id), demoRecord);
+    }
+
+    // 3. Ensure Monthly Goals exist for the current month
+    const goalsSnap = await getDocs(monthlyGoalsCol);
+    if (goalsSnap.empty) {
+      const defaultGoals: MonthlyGoals = {
+        id: 'current-goals',
+        monthYear: '2026-09',
+        targetTournaments: 6,
+        targetMatches: 30,
+        targetWinRate: 60,
+        targetOfficialPoints: 100,
+        notes: 'Foco da equipe Spirits para o mês: disputar Copas e Desafios de Liga para acumular CP e garantir vagas oficiais!',
+        updatedAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'monthly_goals', defaultGoals.id), defaultGoals);
+    }
+  } catch (err) {
+    console.error('Error ensuring initial championship data:', err);
+  }
+}
+
+export async function saveMonthlyGoals(goals: MonthlyGoals): Promise<void> {
+  await setDoc(doc(db, 'monthly_goals', goals.id || 'current-goals'), {
+    ...goals,
+    updatedAt: new Date().toISOString()
+  });
+}
+
 
