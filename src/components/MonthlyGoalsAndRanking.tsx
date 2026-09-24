@@ -827,9 +827,9 @@ export default function MonthlyGoalsAndRanking({
 
       {/* MODAL 1: Lançar Pontos Oficiais de Campeonato (CP) */}
       {showAddCpModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
-          <div className="bg-slate-900 border border-amber-500/40 w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-4 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 z-50 animate-fade-in overflow-y-auto">
+          <div className="bg-slate-900 border border-amber-500/40 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] sm:max-h-[88vh] flex flex-col my-auto">
+            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
               <div className="flex items-center gap-2.5 text-amber-400">
                 <Trophy className="w-5 h-5 fill-current" />
                 <h3 className="text-base font-bold text-white">Lançar Pontuação Oficial (CP)</h3>
@@ -842,7 +842,8 @@ export default function MonthlyGoalsAndRanking({
               </button>
             </div>
 
-            <form onSubmit={handleSaveCp} className="space-y-4">
+            <form onSubmit={handleSaveCp} className="flex flex-col flex-1 overflow-hidden min-h-0">
+              <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 overscroll-contain">
               
               {/* Membro do Time Spirits */}
               <div>
@@ -999,18 +1000,21 @@ export default function MonthlyGoalsAndRanking({
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              </div>
+
+              {/* Pinned Footer */}
+              <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-t border-slate-800 bg-slate-950/90 flex items-center justify-end gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowAddCpModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 transition-colors cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={submittingCp}
-                  className="px-5 py-2 rounded-xl text-xs font-black text-slate-950 bg-amber-500 hover:bg-amber-400 transition-all shadow cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl text-xs font-black text-slate-950 bg-amber-500 hover:bg-amber-400 transition-all shadow cursor-pointer disabled:opacity-50"
                 >
                   {submittingCp ? 'Salvando...' : 'Salvar Pontuação Oficial'}
                 </button>
@@ -1022,9 +1026,9 @@ export default function MonthlyGoalsAndRanking({
 
       {/* MODAL 2: Editar Metas Mensais */}
       {showEditGoalsModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
-          <div className="bg-slate-900 border border-purple-500/40 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 z-50 animate-fade-in overflow-y-auto">
+          <div className="bg-slate-900 border border-purple-500/40 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] sm:max-h-[88vh] flex flex-col my-auto">
+            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
               <div className="flex items-center gap-2.5 text-purple-400">
                 <Target className="w-5 h-5" />
                 <h3 className="text-base font-bold text-white">Definir Metas Mensais do Time</h3>
@@ -1037,97 +1041,100 @@ export default function MonthlyGoalsAndRanking({
               </button>
             </div>
 
-            <form onSubmit={handleSaveGoals} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-amber-300 uppercase tracking-wider mb-1">
-                  Meta de Pontos Oficiais do Time (CP)
-                </label>
-                <input
-                  type="number"
-                  min="10"
-                  max="2000"
-                  value={editTargetOfficialPoints}
-                  onChange={(e) => setEditTargetOfficialPoints(Number(e.target.value))}
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 font-mono"
-                />
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
-                  Total de Championship Points que a equipe visa acumular no mês.
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleSaveGoals} className="flex flex-col flex-1 overflow-hidden min-h-0">
+              <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 overscroll-contain">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                    Torneios Disputados
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    value={editTargetTournaments}
-                    onChange={(e) => setEditTargetTournaments(Number(e.target.value))}
-                    required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                    Winrate Alvo (%)
+                  <label className="block text-xs font-bold text-amber-300 uppercase tracking-wider mb-1">
+                    Meta de Pontos Oficiais do Time (CP)
                   </label>
                   <input
                     type="number"
                     min="10"
-                    max="100"
-                    value={editTargetWinRate}
-                    onChange={(e) => setEditTargetWinRate(Number(e.target.value))}
+                    max="2000"
+                    value={editTargetOfficialPoints}
+                    onChange={(e) => setEditTargetOfficialPoints(Number(e.target.value))}
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 font-mono"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Total de Championship Points que a equipe visa acumular no mês.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                      Torneios Disputados
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={editTargetTournaments}
+                      onChange={(e) => setEditTargetTournaments(Number(e.target.value))}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                      Winrate Alvo (%)
+                    </label>
+                    <input
+                      type="number"
+                      min="10"
+                      max="100"
+                      value={editTargetWinRate}
+                      onChange={(e) => setEditTargetWinRate(Number(e.target.value))}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Volume de Partidas da Equipe
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="500"
+                    value={editTargetMatches}
+                    onChange={(e) => setEditTargetMatches(Number(e.target.value))}
                     required
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 font-mono"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Mensagem / Foco Estratégico
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    placeholder="Ex: Treinar match-up contra Charizard e focar na Copa de Liga de Sábado..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 resize-none"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                  Volume de Partidas da Equipe
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="500"
-                  value={editTargetMatches}
-                  onChange={(e) => setEditTargetMatches(Number(e.target.value))}
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                  Mensagem / Foco Estratégico
-                </label>
-                <textarea
-                  rows={2}
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                  placeholder="Ex: Treinar match-up contra Charizard e focar na Copa de Liga de Sábado..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 resize-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              {/* Pinned Footer */}
+              <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-t border-slate-800 bg-slate-950/90 flex items-center justify-end gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowEditGoalsModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 transition-colors cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingGoals}
-                  className="px-5 py-2 rounded-xl text-xs font-black text-white bg-purple-600 hover:bg-purple-500 transition-all shadow cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl text-xs font-black text-white bg-purple-600 hover:bg-purple-500 transition-all shadow cursor-pointer disabled:opacity-50"
                 >
                   {savingGoals ? 'Salvando...' : 'Atualizar Metas'}
                 </button>
@@ -1139,9 +1146,9 @@ export default function MonthlyGoalsAndRanking({
 
       {/* MODAL 3: Histórico Individual de Torneios do Jogador */}
       {selectedMemberForHistory && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-4 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 z-50 animate-fade-in overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700/80 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] sm:max-h-[88vh] flex flex-col my-auto">
+            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center">
                   <PokemonSprite name={selectedMemberForHistory.avatarSprite || 'pikachu'} size="sm" />
@@ -1158,13 +1165,13 @@ export default function MonthlyGoalsAndRanking({
               </div>
               <button 
                 onClick={() => setSelectedMemberForHistory(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+            <div className="p-5 sm:p-6 space-y-3 overflow-y-auto flex-1 overscroll-contain">
               {cpRecords.filter(r => r.memberId === selectedMemberForHistory.id).length === 0 ? (
                 <div className="text-center py-8 text-xs text-slate-500 font-mono">
                   Nenhum torneio registrado individualmente para este jogador ainda.
@@ -1206,11 +1213,11 @@ export default function MonthlyGoalsAndRanking({
               )}
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-slate-800">
+            <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-t border-slate-800 bg-slate-950/90 flex justify-end shrink-0">
               <button
                 type="button"
                 onClick={() => setSelectedMemberForHistory(null)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-750 transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
               >
                 Fechar
               </button>

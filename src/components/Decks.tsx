@@ -1014,15 +1014,17 @@ export default function Decks({ currentMember }: DecksProps) {
 
       {/* Import Modal */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="import-deck-modal">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 z-50 animate-fade-in overflow-y-auto" id="import-deck-modal">
+          <div className="bg-slate-900 border border-slate-700/80 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] sm:max-h-[88vh] flex flex-col my-auto">
             
             {/* Header */}
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-purple-900/40 to-slate-900">
+            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
               <div className="flex items-center gap-2.5">
-                {editingDeck ? <Pencil className="w-5 h-5 text-purple-400 shrink-0" /> : <Wand2 className="w-5 h-5 text-purple-400 shrink-0" />}
+                <div className="p-2 bg-purple-950/60 border border-purple-500/30 rounded-xl text-purple-400">
+                  {editingDeck ? <Pencil className="w-5 h-5 text-purple-400 shrink-0" /> : <Wand2 className="w-5 h-5 text-purple-400 shrink-0" />}
+                </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">
+                  <h3 className="text-base sm:text-lg font-bold text-white">
                     {editingDeck ? `Editar Baralho: ${editingDeck.deckName}` : 'Importar Deck Inteligente'}
                   </h3>
                   <p className="text-xs text-slate-400">
@@ -1038,123 +1040,138 @@ export default function Decks({ currentMember }: DecksProps) {
                   setShowImportModal(false);
                   setEditingDeck(null);
                 }}
-                className="text-slate-400 hover:text-white transition-all cursor-pointer p-1 rounded-lg hover:bg-slate-800"
+                className="text-slate-400 hover:text-white transition-all cursor-pointer p-1.5 rounded-lg hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleParseAndSave} className="p-6 overflow-y-auto space-y-4 flex-1">
-              
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-300 uppercase">Nome do Deck:</label>
-                <input
-                  id="import-deck-name"
-                  type="text"
-                  placeholder="ex: Meu Charizard ex Competitivo"
-                  value={deckName}
-                  onChange={(e) => setDeckName(e.target.value)}
-                  className="w-full p-2.5 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none"
-                  required
-                />
-              </div>
-
-              {/* Identificação do Arquétipo por Pokémon 1 e Pokémon 2 */}
-              {/* Identificação dos Pokémon (Campos normais de digitação) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Pokémon 1 (Principal) */}
+            <form onSubmit={handleParseAndSave} className="flex flex-col flex-1 overflow-hidden min-h-0">
+              <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1 overscroll-contain">
+                
                 <div className="space-y-1.5">
-                  <label htmlFor="import-deck-pokemon1" className="block text-xs font-semibold text-slate-300">
-                    Pokémon 1 (Principal): <span className="text-purple-400">*</span>
-                  </label>
+                  <label className="block text-xs font-bold text-slate-200 uppercase tracking-wider">Nome do Deck:</label>
                   <input
-                    id="import-deck-pokemon1"
+                    id="import-deck-name"
                     type="text"
-                    placeholder="ex: Charizard ex, Lugia VSTAR"
-                    value={pokemon1}
-                    onChange={(e) => setPokemon1(e.target.value)}
-                    className="w-full p-2.5 bg-slate-900 border border-slate-800 focus:border-purple-500 rounded-lg text-white text-sm outline-none font-medium"
+                    placeholder="ex: Meu Charizard ex Competitivo"
+                    value={deckName}
+                    onChange={(e) => setDeckName(e.target.value)}
+                    className="w-full p-2.5 bg-slate-950 border border-slate-700 focus:border-purple-500 rounded-xl text-white text-sm outline-none font-medium"
                     required
                   />
-                  <p className="text-[10px] text-slate-500">Atacante principal ou foco do deck</p>
                 </div>
 
-                {/* Pokémon 2 (Secundário / Suporte) */}
+                {/* Identificação do Arquétipo por Pokémon 1 e Pokémon 2 */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Pokémon 1 (Principal) */}
+                  <div className="space-y-1.5">
+                    <label htmlFor="import-deck-pokemon1" className="block text-xs font-bold text-slate-200">
+                      Pokémon 1 (Principal): <span className="text-purple-400">*</span>
+                    </label>
+                    <input
+                      id="import-deck-pokemon1"
+                      type="text"
+                      placeholder="ex: Charizard ex, Lugia VSTAR"
+                      value={pokemon1}
+                      onChange={(e) => setPokemon1(e.target.value)}
+                      className="w-full p-2.5 bg-slate-950 border border-slate-700 focus:border-purple-500 rounded-xl text-white text-sm outline-none font-medium"
+                      required
+                    />
+                    <p className="text-[10px] text-slate-400">Atacante principal ou foco do deck</p>
+                  </div>
+
+                  {/* Pokémon 2 (Secundário / Suporte) */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label htmlFor="import-deck-pokemon2" className="block text-xs font-bold text-slate-200">
+                        Pokémon 2 (Secundário):
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-mono">Opcional</span>
+                    </div>
+                    <input
+                      id="import-deck-pokemon2"
+                      type="text"
+                      placeholder="ex: Pidgeot ex, Dusclops"
+                      value={pokemon2}
+                      onChange={(e) => setPokemon2(e.target.value)}
+                      className="w-full p-2.5 bg-slate-950 border border-slate-700 focus:border-purple-500 rounded-xl text-white text-sm outline-none font-medium"
+                    />
+                    <p className="text-[10px] text-slate-400">Suporte ou parceiro estratégico</p>
+                  </div>
+                </div>
+
+                {/* Paste box */}
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center">
-                    <label htmlFor="import-deck-pokemon2" className="block text-xs font-semibold text-slate-300">
-                      Pokémon 2 (Secundário):
-                    </label>
-                    <span className="text-[10px] text-slate-500 font-mono">Opcional</span>
+                    <label className="block text-xs font-bold text-slate-200 uppercase tracking-wider">Cole a Lista de Exportação do PTCG Live:</label>
+                    <span className="text-[10px] text-purple-300 bg-purple-950/60 border border-purple-500/30 px-2 py-0.5 rounded font-bold font-mono">Suporta Português e Inglês</span>
                   </div>
-                  <input
-                    id="import-deck-pokemon2"
-                    type="text"
-                    placeholder="ex: Pidgeot ex, Dusclops"
-                    value={pokemon2}
-                    onChange={(e) => setPokemon2(e.target.value)}
-                    className="w-full p-2.5 bg-slate-900 border border-slate-800 focus:border-purple-500 rounded-lg text-white text-sm outline-none font-medium"
-                  />
-                  <p className="text-[10px] text-slate-500">Suporte ou parceiro estratégico</p>
-                </div>
-              </div>
-
-              {/* Paste box */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <label className="block text-xs font-bold text-slate-300 uppercase">Cole a Lista de Exportação do PTCG Live:</label>
-                  <span className="text-[10px] text-purple-400 bg-purple-950/40 px-2 py-0.5 rounded font-bold font-mono">Suporta Português e Inglês</span>
-                </div>
-                <textarea
-                  id="import-deck-list-input"
-                  rows={8}
-                  placeholder={`Cole aqui... ex:
+                  <textarea
+                    id="import-deck-list-input"
+                    rows={7}
+                    placeholder={`Cole aqui... ex:
 Pokémon: 3
 3 Charizard ex OBF 125
 2 Charmeleon OBF 124
 3 Charmander OBF 26
 ...`}
-                  value={rawText}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setRawText(val);
-                    if (!pokemon1.trim() && val.trim()) {
-                      const detected = detectPokemonsFromDeckText(val);
-                      if (detected.p1) setPokemon1(detected.p1);
-                      if (detected.p2) setPokemon2(detected.p2);
-                    }
-                  }}
-                  className="w-full p-3 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-xs font-mono outline-none resize-none leading-relaxed"
-                  required
-                />
-              </div>
+                    value={rawText}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setRawText(val);
+                      if (!pokemon1.trim() && val.trim()) {
+                        const detected = detectPokemonsFromDeckText(val);
+                        if (detected.p1) setPokemon1(detected.p1);
+                        if (detected.p2) setPokemon2(detected.p2);
+                      }
+                    }}
+                    className="w-full p-3 bg-slate-950 border border-slate-700 focus:border-purple-500 rounded-xl text-white text-xs font-mono outline-none resize-none leading-relaxed"
+                    required
+                  />
+                </div>
 
-              <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-850/60 flex gap-3">
-                <div className="text-xl">🤖</div>
-                <div className="text-[11px] text-slate-400 leading-relaxed">
-                  <strong className="text-white">Análise de IA Ativada:</strong> Nosso assistente Gemini analisará a lista, identificará as quantidades, sets e buscará as imagens oficiais correspondentes de cada card para montar seu deck sheet visual de alto impacto!
+                <div className="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800 flex items-center gap-3">
+                  <div className="text-xl">🤖</div>
+                  <div className="text-[11px] text-slate-300 leading-relaxed">
+                    <strong className="text-white">Análise de Lista Automática:</strong> Identifica quantidades, nomes oficiais e associa os scans com alta resolução para o time.
+                  </div>
                 </div>
               </div>
 
-              <button
-                id="btn-submit-import-deck"
-                type="submit"
-                disabled={parsing}
-                className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:bg-slate-800 text-white font-bold rounded-xl text-sm cursor-pointer shadow-lg flex items-center justify-center gap-2 transition-all"
-              >
-                {parsing ? (
-                  <>
-                    <Sparkles className="w-4 h-4 animate-spin text-purple-200" />
-                    <span>{editingDeck ? 'Atualizando Baralho...' : 'Analisando Lista com IA de Elite...'}</span>
-                  </>
-                ) : (
-                  <>
-                    {editingDeck ? <Check className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
-                    <span>{editingDeck ? 'Salvar Alterações no Baralho' : 'Analisar e Salvar no Time'}</span>
-                  </>
-                )}
-              </button>
+              {/* Fixed Footer with Cancel and Submit */}
+              <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-t border-slate-800 bg-slate-950/90 flex items-center justify-end gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setEditingDeck(null);
+                  }}
+                  className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  id="btn-submit-import-deck"
+                  type="submit"
+                  disabled={parsing}
+                  className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:bg-slate-800 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer shadow-lg flex items-center justify-center gap-2 transition-all"
+                >
+                  {parsing ? (
+                    <>
+                      <Sparkles className="w-4 h-4 animate-spin text-purple-200" />
+                      <span>{editingDeck ? 'Atualizando Baralho...' : 'Analisando Lista com IA de Elite...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      {editingDeck ? <Check className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+                      <span>{editingDeck ? 'Salvar Alterações no Baralho' : 'Analisar e Salvar no Time'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
 
             </form>
 

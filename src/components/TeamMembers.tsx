@@ -439,107 +439,123 @@ export default function TeamMembers({ currentMember, setCurrentMember, onMemberU
 
       {/* Add Teammate Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="add-member-modal">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 z-50 animate-fade-in overflow-y-auto" id="add-member-modal">
+          <div className="bg-slate-900 border border-slate-700/80 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] sm:max-h-[88vh] flex flex-col my-auto">
             
             {/* Header */}
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-purple-900/40 to-slate-900">
-              <div className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-purple-400" />
-                <h3 className="text-base font-bold text-white">Cadastrar Novo Spirits Member</h3>
+            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-purple-950/60 border border-purple-500/30 rounded-xl text-purple-400">
+                  <UserPlus className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Cadastrar Novo Spirits Member</h3>
+                  <p className="text-xs text-slate-400">Insira os dados do treinador para o roster da equipe.</p>
+                </div>
               </div>
               <button 
                 id="close-add-member-x"
                 onClick={() => setShowAddModal(false)}
-                className="text-slate-400 hover:text-white transition-all cursor-pointer"
+                className="text-slate-400 hover:text-white transition-all cursor-pointer p-1.5 rounded-lg hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleRegisterMember} className="p-6 overflow-y-auto space-y-4 flex-1">
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleRegisterMember} className="flex flex-col flex-1 overflow-hidden min-h-0">
+              <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 overscroll-contain">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-300 uppercase">Nome Completo:</label>
+                    <input
+                      id="member-name-input"
+                      type="text"
+                      placeholder="ex: Carlos Alberto"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full p-2.5 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none font-medium"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-300 uppercase">
+                      Level / Classificação: {!hasStaffPermission && <span className="text-red-400 font-bold text-[10px]">(Apenas Staff)</span>}
+                    </label>
+                    <select
+                      id="member-role-select"
+                      value={role}
+                      disabled={!hasStaffPermission}
+                      onChange={(e) => setRole(e.target.value as any)}
+                      className="w-full p-2.5 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none disabled:opacity-50 cursor-pointer font-medium"
+                    >
+                      <option value="pokeball">🔴 Level Pokéball</option>
+                      <option value="greatball">🔵 Level Greatball</option>
+                      <option value="ultraball">⚫ Level Ultraball</option>
+                      <option value="masterball">🟣 Level Masterball</option>
+                      <option value="Premium ball">✨ Level Premium (Staff)</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-300 uppercase">Nome Completo:</label>
+                  <label className="block text-xs font-bold text-slate-300 uppercase">Nickname / Apelido em Jogo (Opcional):</label>
                   <input
-                    id="member-name-input"
+                    id="member-nickname-input"
                     type="text"
-                    placeholder="ex: Carlos Alberto"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full p-2.5 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none"
-                    required
+                    placeholder="ex: FireBlast99"
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
+                    className="w-full p-2.5 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none font-medium"
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-300 uppercase">
-                    Level / Classificação: {!hasStaffPermission && <span className="text-red-400 font-bold text-[10px]">(Apenas Staff)</span>}
-                  </label>
-                  <select
-                    id="member-role-select"
-                    value={role}
-                    disabled={!hasStaffPermission}
-                    onChange={(e) => setRole(e.target.value as any)}
-                    className="w-full p-2.5 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none disabled:opacity-50 cursor-pointer"
-                  >
-                    <option value="pokeball">🔴 Level Pokéball</option>
-                    <option value="greatball">🔵 Level Greatball</option>
-                    <option value="ultraball">⚫ Level Ultraball</option>
-                    <option value="masterball">🟣 Level Masterball</option>
-                    <option value="Premium ball">✨ Level Premium (Staff)</option>
-                  </select>
+                {/* Dynamic Search Sprite Selection */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-300 uppercase">Pokémon do Avatar (Digite o nome):</label>
+                  <input 
+                    type="text" 
+                    id="member-avatar"
+                    placeholder="Ex: pikachu, mew, charizard" 
+                    value={avatarSprite}
+                    onChange={(e) => setAvatarSprite(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    className="w-full p-2.5 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none placeholder-slate-600 font-medium"
+                  />
+                </div>
+
+                {/* Live Preview Card */}
+                <div className="flex items-center gap-4 bg-slate-950/40 p-3.5 rounded-xl border border-slate-850/80">
+                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 shrink-0">
+                    <PokemonSprite name={avatarSprite || 'pikachu'} size="md" />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Preview do Avatar Animado</h4>
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
+                      O sprite do Pokémon acima se ajustará instantaneamente conforme você digita. Use nomes em inglês.
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-300 uppercase">Nickname / Apelido em Jogo (Opcional):</label>
-                <input
-                  id="member-nickname-input"
-                  type="text"
-                  placeholder="ex: FireBlast99"
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  className="w-full p-2.5 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none"
-                />
+              {/* Pinned Footer */}
+              <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-t border-slate-800 bg-slate-950/90 flex items-center justify-end gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  id="btn-submit-add-member"
+                  type="submit"
+                  disabled={registering}
+                  className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:bg-slate-800 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer shadow-lg transition-all"
+                >
+                  {registering ? 'Efetuando matrícula Spirits...' : 'Cadastrar Spirits Member'}
+                </button>
               </div>
-
-              {/* Dynamic Search Sprite Selection */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-300 uppercase">Pokémon do Avatar (Digite o nome):</label>
-                <input 
-                  type="text" 
-                  id="member-avatar"
-                  placeholder="Ex: pikachu, mew, charizard" 
-                  value={avatarSprite}
-                  onChange={(e) => setAvatarSprite(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                  className="w-full p-2.5 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none placeholder-slate-600"
-                />
-              </div>
-
-              {/* Live Preview Card */}
-              <div className="flex items-center gap-4 bg-slate-950/40 p-3.5 rounded-xl border border-slate-850/80">
-                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 shrink-0">
-                  <PokemonSprite name={avatarSprite || 'pikachu'} size="md" />
-                </div>
-                <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Preview do Avatar Animado</h4>
-                  <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
-                    O sprite do Pokémon acima se ajustará instantaneamente conforme você digita. Use nomes em inglês.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                id="btn-submit-add-member"
-                type="submit"
-                disabled={registering}
-                className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:bg-slate-800 text-white font-bold rounded-xl text-sm cursor-pointer shadow-lg"
-              >
-                {registering ? 'Efetuando matrícula Spirits...' : 'Cadastrar Spirits Member'}
-              </button>
 
             </form>
 
@@ -549,72 +565,88 @@ export default function TeamMembers({ currentMember, setCurrentMember, onMemberU
 
       {/* Edit Profile Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="edit-profile-modal">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 z-50 animate-fade-in overflow-y-auto" id="edit-profile-modal">
+          <div className="bg-slate-900 border border-slate-700/80 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] sm:max-h-[88vh] flex flex-col my-auto">
             
             {/* Header */}
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-purple-900/40 to-slate-900">
-              <div className="flex items-center gap-2">
-                <UserCheck className="w-5 h-5 text-purple-400" />
-                <h3 className="text-base font-bold text-white">Editar Meu Perfil Spirits</h3>
+            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-purple-950/60 border border-purple-500/30 rounded-xl text-purple-400">
+                  <UserCheck className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Editar Meu Perfil Spirits</h3>
+                  <p className="text-xs text-slate-400">Atualize seu nickname ou Pokémon companheiro.</p>
+                </div>
               </div>
               <button 
                 id="close-edit-profile-x"
                 onClick={() => setShowEditModal(false)}
-                className="text-slate-400 hover:text-white transition-all cursor-pointer"
+                className="text-slate-400 hover:text-white transition-all cursor-pointer p-1.5 rounded-lg hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleUpdateProfile} className="p-6 overflow-y-auto space-y-4 flex-1">
-              
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-300 uppercase">Nickname / Apelido em Jogo:</label>
-                <input
-                  id="edit-nickname-input"
-                  type="text"
-                  placeholder="Seu nick competitivo"
-                  value={editNickname}
-                  onChange={(e) => setEditNickname(e.target.value)}
-                  className="w-full p-2.5 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none"
-                />
-              </div>
-
-              {/* Dynamic Search Sprite Selection */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-300 uppercase">Pokémon do Avatar (Digite o nome):</label>
-                <input 
-                  type="text" 
-                  id="edit-member-avatar"
-                  placeholder="Ex: pikachu, mew, charizard" 
-                  value={editAvatarSprite}
-                  onChange={(e) => setEditAvatarSprite(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                  className="w-full p-2.5 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none placeholder-slate-600"
-                />
-              </div>
-
-              {/* Live Preview Card */}
-              <div className="flex items-center gap-4 bg-slate-950/40 p-3.5 rounded-xl border border-slate-850/80">
-                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 shrink-0">
-                  <PokemonSprite name={editAvatarSprite || 'pikachu'} size="md" />
+            <form onSubmit={handleUpdateProfile} className="flex flex-col flex-1 overflow-hidden min-h-0">
+              <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 overscroll-contain">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-300 uppercase">Nickname / Apelido em Jogo:</label>
+                  <input
+                    id="edit-nickname-input"
+                    type="text"
+                    placeholder="Seu nick competitivo"
+                    value={editNickname}
+                    onChange={(e) => setEditNickname(e.target.value)}
+                    className="w-full p-2.5 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none font-medium"
+                  />
                 </div>
-                <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Preview do Avatar Animado</h4>
-                  <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
-                    O sprite do Pokémon acima se ajustará instantaneamente conforme você digita. Use nomes de Pokémon em inglês.
-                  </p>
+
+                {/* Dynamic Search Sprite Selection */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-300 uppercase">Pokémon do Avatar (Digite o nome):</label>
+                  <input 
+                    type="text" 
+                    id="edit-member-avatar"
+                    placeholder="Ex: pikachu, mew, charizard" 
+                    value={editAvatarSprite}
+                    onChange={(e) => setEditAvatarSprite(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    className="w-full p-2.5 bg-slate-950 border border-slate-850 focus:border-purple-500 rounded-lg text-white text-sm outline-none placeholder-slate-600 font-medium"
+                  />
+                </div>
+
+                {/* Live Preview Card */}
+                <div className="flex items-center gap-4 bg-slate-950/40 p-3.5 rounded-xl border border-slate-850/80">
+                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 shrink-0">
+                    <PokemonSprite name={editAvatarSprite || 'pikachu'} size="md" />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Preview do Avatar Animado</h4>
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
+                      O sprite do Pokémon acima se ajustará instantaneamente conforme você digita. Use nomes de Pokémon em inglês.
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <button
-                id="btn-submit-edit-profile"
-                type="submit"
-                className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl text-sm cursor-pointer shadow-lg"
-              >
-                Salvar Alterações no Meu Perfil
-              </button>
+              {/* Pinned Footer */}
+              <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-t border-slate-800 bg-slate-950/90 flex items-center justify-end gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  id="btn-submit-edit-profile"
+                  type="submit"
+                  className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer shadow-lg transition-all"
+                >
+                  Salvar Alterações no Meu Perfil
+                </button>
+              </div>
 
             </form>
 

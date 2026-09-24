@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db, matchesCol, membersCol, decksCol, tournamentsCol } from '../lib/firebase';
+import { db, matchesCol, membersCol, decksCol, tournamentsCol, purgeAllDataExceptDecks } from '../lib/firebase';
 import { getDocs, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { Member, MatchRecord, DeckRecord, Tournament } from '../types';
 import { 
@@ -14,7 +14,10 @@ import {
   FileText,
   Play,
   RotateCcw,
-  Trophy
+  Trophy,
+  Trash2,
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import PokemonSprite from './PokemonSprite';
 import PokemonLoader from './PokemonLoader';
@@ -59,6 +62,8 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
   const [selectedMatches, setSelectedMatches] = useState<string[]>([]);
   const [showOnlyMine, setShowOnlyMine] = useState<boolean>(false);
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [showDirectPurgeModal, setShowDirectPurgeModal] = useState<boolean>(false);
+  const [purgingDirect, setPurgingDirect] = useState<boolean>(false);
 
   // Filter conditions
   const [filterResult, setFilterResult] = useState<string>('all');
@@ -293,6 +298,23 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
     }
   };
 
+  const handlePurgeAllMatches = async () => {
+    try {
+      setPurgingDirect(true);
+      await purgeAllDataExceptDecks();
+      setMatches([]);
+      setSelectedMatches([]);
+      setShowDirectPurgeModal(false);
+      if (onSyncMatch) onSyncMatch();
+      await loadMatches();
+    } catch (err) {
+      console.error('Error purging matches:', err);
+      alert('Erro ao zerar dados. Tente novamente.');
+    } finally {
+      setPurgingDirect(false);
+    }
+  };
+
   const handleRegisterMatch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (player2IsMember && !player2Id) {
@@ -488,6 +510,18 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
+          {matches.length > 0 && (
+            <button
+              id="btn-purge-matches-direct"
+              onClick={() => setShowDirectPurgeModal(true)}
+              className="px-3.5 py-2 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/50 text-rose-300 hover:text-white rounded-lg font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-md"
+              title="Zerar partidas mantendo os decks cadastrados intactos"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>Zerar Partidas (Manter Decks)</span>
+            </button>
+          )}
+
           {activeSection === 'history' && selectedMatches.length > 0 && (
             <button
               id="btn-delete-selected"
@@ -859,26 +893,32 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
 
           {/* Form Overlay Modal */}
           {showFormModal && (
-            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="register-match-modal">
-              <div className="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 z-50 animate-fade-in overflow-y-auto" id="register-match-modal">
+              <div className="bg-slate-900 border border-slate-700/80 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] sm:max-h-[88vh] flex flex-col my-auto">
                 
                 {/* Header */}
-                <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-purple-900/40 to-slate-900">
-                  <div className="flex items-center gap-2">
-                    <Swords className="w-5 h-5 text-purple-400" />
-                    <h3 className="text-base font-bold text-white">Registrar Partida Competitiva</h3>
+                <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-purple-950/60 border border-purple-500/30 rounded-xl text-purple-400">
+                      <Swords className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base sm:text-lg font-bold text-white">Registrar Partida Competitiva</h3>
+                      <p className="text-xs text-slate-400">Confronto individual ou em torneio oficial</p>
+                    </div>
                   </div>
                   <button 
                     id="close-form-x"
                     onClick={() => setShowFormModal(false)}
-                    className="text-slate-400 hover:text-white transition-all cursor-pointer"
+                    className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-all cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
 
-                {/* Form */}
-                <form onSubmit={handleRegisterMatch} className="p-6 overflow-y-auto space-y-4 flex-1">
+                {/* Form wrapper */}
+                <form onSubmit={handleRegisterMatch} className="flex flex-col flex-1 overflow-hidden min-h-0">
+                  <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1 overscroll-contain">
                   
                   {/* Tournament / Event Selector */}
                   <div className="space-y-1.5 bg-slate-950/50 p-3 rounded-xl border border-slate-850">
@@ -1302,17 +1342,95 @@ export default function Matches({ currentMember, setActiveTab, initialSubTab = '
                     />
                   </div>
 
-                  <button
-                    id="btn-submit-match"
-                    type="submit"
-                    disabled={registering}
-                    className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:bg-slate-800 text-white font-bold rounded-xl text-sm cursor-pointer transition-all shadow-lg"
-                  >
-                    {registering ? 'Registrando na Arena...' : 'Confirmar e Atualizar Ranking'}
-                  </button>
+                  </div>
+
+                  {/* Fixed Pinned Footer with Action Buttons */}
+                  <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-t border-slate-800 bg-slate-950/90 flex items-center justify-end gap-3 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowFormModal(false)}
+                      className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      id="btn-submit-match"
+                      type="submit"
+                      disabled={registering}
+                      className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:bg-slate-800 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-all shadow-lg flex items-center gap-2"
+                    >
+                      {registering ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Registrando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Swords className="w-4 h-4" />
+                          <span>Confirmar e Registrar Partida</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
 
                 </form>
 
+              </div>
+            </div>
+          )}
+
+          {/* Direct Purge Modal from Matches Tab */}
+          {showDirectPurgeModal && (
+            <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in" id="purge-matches-direct-modal">
+              <div className="bg-slate-900 border border-rose-500/40 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4 animate-scale-up">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-rose-950/50 border border-rose-500/30 rounded-xl text-rose-400">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Zerar Partidas e Histórico</h3>
+                    <p className="text-xs text-rose-300">Preservando todos os seus decks cadastrados</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 text-xs text-slate-300 leading-relaxed bg-slate-950/50 p-4 rounded-xl border border-slate-850">
+                  <p>
+                    Esta ação irá remover todas as <strong>{matches.length} partidas registradas</strong> e resetar o winrate do time.
+                  </p>
+                  <p className="text-emerald-300 font-semibold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Seus baralhos/decks cadastrados permanecerão 100% salvos e protegidos.</span>
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowDirectPurgeModal(false)}
+                    disabled={purgingDirect}
+                    className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePurgeAllMatches}
+                    disabled={purgingDirect}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-bold shadow-lg shadow-rose-950/50 transition-all cursor-pointer flex items-center gap-2"
+                  >
+                    {purgingDirect ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Zerando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4" />
+                        <span>Confirmar e Zerar Partidas</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}

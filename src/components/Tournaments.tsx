@@ -1089,16 +1089,21 @@ export default function Tournaments({ currentMember }: TournamentsProps) {
 
       {/* 5. MODAL DE CADASTRO / EDIÇÃO */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl max-h-[92vh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200">
             
             {/* Modal Header */}
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
-              <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-amber-400" />
-                <h3 className="font-bold text-white text-base md:text-lg">
-                  {editingTournament ? 'Editar Campeonato' : 'Cadastrar Grande Campeonato'}
-                </h3>
+            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-purple-950/60 border border-purple-500/30 rounded-xl text-amber-400">
+                  <Trophy className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base md:text-lg">
+                    {editingTournament ? 'Editar Campeonato' : 'Cadastrar Grande Campeonato'}
+                  </h3>
+                  <p className="text-xs text-slate-400">Preencha os detalhes oficiais do evento para o time.</p>
+                </div>
               </div>
               <button 
                 onClick={() => setIsModalOpen(false)}
@@ -1109,7 +1114,8 @@ export default function Tournaments({ currentMember }: TournamentsProps) {
             </div>
 
             {/* Modal Body / Form */}
-            <form onSubmit={handleSaveTournament} className="p-6 space-y-4 overflow-y-auto flex-1">
+            <form onSubmit={handleSaveTournament} className="flex flex-col flex-1 overflow-hidden min-h-0">
+              <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 overscroll-contain">
               
               {/* Sugestões Rápidas de Cidade do Centro-Oeste */}
               <div className="space-y-1">
@@ -1421,36 +1427,37 @@ export default function Tournaments({ currentMember }: TournamentsProps) {
                   className="w-full p-2.5 bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl text-white text-xs outline-none font-medium"
                 />
               </div>
+            </div>
 
-              {/* Modal Actions */}
-              <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-purple-900/30 transition-all cursor-pointer flex items-center gap-2"
-                >
-                  {saving ? (
-                    <>
-                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    <>
-                      <Trophy className="w-4 h-4" />
-                      {editingTournament ? 'Salvar Alterações' : 'Publicar Grande Campeonato'}
-                    </>
-                  )}
-                </button>
-              </div>
+            {/* Pinned Modal Actions Footer */}
+            <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-t border-slate-800 bg-slate-950/90 flex items-center justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-purple-900/30 transition-all cursor-pointer flex items-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Trophy className="w-4 h-4" />
+                    {editingTournament ? 'Salvar Alterações' : 'Publicar Grande Campeonato'}
+                  </>
+                )}
+              </button>
+            </div>
 
-            </form>
+          </form>
 
           </div>
         </div>

@@ -75,88 +75,8 @@ export async function seedDatabaseIfEmpty() {
       await setDoc(doc(db, 'members', m.id), m);
     }
 
-    // 2. Collection Seeding (Card sharing pool)
-    const defaultCards: CardItem[] = [
-      {
-        id: 'sv3-125',
-        name: 'Charizard ex',
-        imageUrl: 'https://images.pokemontcg.io/sv3/125.png',
-        setCode: 'sv3',
-        setName: 'Obsidian Flames',
-        setNumber: '125',
-        quantity: 4,
-        ownerId: 'member-1',
-        ownerName: 'Guilherme Silva',
-        isLendable: true,
-        lentToUserId: null,
-        lentToUserName: null,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'sv4-163',
-        name: 'Roaring Moon ex',
-        imageUrl: 'https://images.pokemontcg.io/sv4/163.png',
-        setCode: 'sv4',
-        setName: 'Paradox Rift',
-        setNumber: '163',
-        quantity: 3,
-        ownerId: 'member-2',
-        ownerName: 'Thiago Pereira',
-        isLendable: true,
-        lentToUserId: 'member-4',
-        lentToUserName: 'Matheus Santos',
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'sv1-86',
-        name: 'Gardevoir ex',
-        imageUrl: 'https://images.pokemontcg.io/sv1/86.png',
-        setCode: 'sv1',
-        setName: 'Scarlet & Violet Base Set',
-        setNumber: '86',
-        quantity: 4,
-        ownerId: 'member-3',
-        ownerName: 'Lucas Souza',
-        isLendable: true,
-        lentToUserId: null,
-        lentToUserName: null,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'sv3-135',
-        name: 'Pidgeot ex',
-        imageUrl: 'https://images.pokemontcg.io/sv3/135.png',
-        setCode: 'sv3',
-        setName: 'Obsidian Flames',
-        setNumber: '135',
-        quantity: 2,
-        ownerId: 'member-1',
-        ownerName: 'Guilherme Silva',
-        isLendable: true,
-        lentToUserId: null,
-        lentToUserName: null,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'pgo-55',
-        name: 'Snorlax',
-        imageUrl: 'https://images.pokemontcg.io/pgo/55.png',
-        setCode: 'pgo',
-        setName: 'Pokémon GO',
-        setNumber: '55',
-        quantity: 4,
-        ownerId: 'member-4',
-        ownerName: 'Matheus Santos',
-        isLendable: false,
-        lentToUserId: null,
-        lentToUserName: null,
-        createdAt: new Date().toISOString()
-      }
-    ];
-
-    for (const c of defaultCards) {
-      await setDoc(doc(db, 'collection', c.id), c);
-    }
+    // 2. Collection Seeding (Starts 100% clean/empty as requested)
+    // No default cards seeded; users register their own authentic collection
 
     // 3. Loans Seeding (Empty list to start clean for production)
     const defaultLoans: LoanRecord[] = [];
@@ -229,76 +149,85 @@ Energia: 1
   }
 }
 
-// Purge all test data (matches, tournaments, loans, trainer logs), preserving decks, members, profiles and collection
-export async function purgeTestDataKeepCore(): Promise<{
+// Purge all user and test data (matches, collection, tournaments, loans, trainer logs, CP), preserving ONLY decks and member profiles
+export async function purgeAllDataExceptDecks(): Promise<{
   deletedMatches: number;
   deletedTournaments: number;
   deletedLoans: number;
   deletedLogs: number;
+  deletedCollection: number;
+  deletedCP: number;
 }> {
   let deletedMatches = 0;
   let deletedTournaments = 0;
   let deletedLoans = 0;
   let deletedLogs = 0;
+  let deletedCollection = 0;
+  let deletedCP = 0;
 
   try {
-    // 1. Matches (Partidas de teste)
+    // 1. Matches (Partidas - zerar tudo)
     const matchesSnap = await getDocs(matchesCol);
     for (const d of matchesSnap.docs) {
       await deleteDoc(doc(db, 'matches', d.id));
       deletedMatches++;
     }
 
-    // 2. Tournaments (Campeonatos de teste)
+    // 2. Collection (Coleção de cartas compartilhadas - zerar tudo conforme solicitado pelo usuário)
+    const collectionSnap = await getDocs(collectionCol);
+    for (const d of collectionSnap.docs) {
+      await deleteDoc(doc(db, 'collection', d.id));
+      deletedCollection++;
+    }
+
+    // 3. Tournaments (Campeonatos - zerar tudo)
     const tournamentsSnap = await getDocs(tournamentsCol);
     for (const d of tournamentsSnap.docs) {
       await deleteDoc(doc(db, 'tournaments', d.id));
       deletedTournaments++;
     }
 
-    // 3. Loans (Empréstimos de teste)
+    // 4. Loans (Empréstimos - zerar tudo)
     const loansSnap = await getDocs(loansCol);
     for (const d of loansSnap.docs) {
       await deleteDoc(doc(db, 'loans', d.id));
       deletedLoans++;
     }
 
-    // 4. Trainer Logs (Replays/Logs do PTCGL de teste)
+    // 5. Trainer Logs (Replays/Logs do PTCGL - zerar tudo)
     const logsSnap = await getDocs(trainerLogsCol);
     for (const d of logsSnap.docs) {
       await deleteDoc(doc(db, 'trainer_logs', d.id));
       deletedLogs++;
     }
 
-    // 5. Reset member match stats to 0 while keeping profiles, custom avatars, roles, favorite cards, and nicknames intact
+    // 6. Championship Points (Zerar registros de CP)
+    const cpSnap = await getDocs(championshipPointsCol);
+    for (const d of cpSnap.docs) {
+      await deleteDoc(doc(db, 'championship_points', d.id));
+      deletedCP++;
+    }
+
+    // 7. Reset member stats to 0 while keeping profiles, custom avatars, roles, favorite cards, and nicknames intact
     const membersSnap = await getDocs(membersCol);
     for (const d of membersSnap.docs) {
       await updateDoc(doc(db, 'members', d.id), {
         wins: 0,
         losses: 0,
-        draws: 0
+        draws: 0,
+        officialPoints: 0
       });
     }
 
-    // 6. Reset any lent status on collection cards
-    const collSnap = await getDocs(collectionCol);
-    for (const d of collSnap.docs) {
-      const data = d.data();
-      if (data.lentToUserId || data.lentToUserName) {
-        await updateDoc(doc(db, 'collection', d.id), {
-          lentToUserId: null,
-          lentToUserName: null
-        });
-      }
-    }
-
-    console.log(`[Spirits Cleanup] Purge complete: ${deletedMatches} matches, ${deletedTournaments} tournaments, ${deletedLoans} loans, ${deletedLogs} logs cleared.`);
+    console.log(`[Spirits Cleanup] Purge complete: ${deletedMatches} matches, ${deletedCollection} collection cards, ${deletedTournaments} tournaments, ${deletedLoans} loans, ${deletedLogs} logs, ${deletedCP} CP cleared. DECKS PRESERVED.`);
   } catch (err) {
     console.error('[Spirits Cleanup] Error during purge:', err);
   }
 
-  return { deletedMatches, deletedTournaments, deletedLoans, deletedLogs };
+  return { deletedMatches, deletedTournaments, deletedLoans, deletedLogs, deletedCollection, deletedCP };
 }
+
+export const purgeTestDataKeepCore = purgeAllDataExceptDecks;
 
 export enum OperationType {
   CREATE = 'create',
@@ -428,29 +357,7 @@ export async function ensureInitialChampionshipData(): Promise<void> {
       }
     }
 
-    // 2. Ensure initial Championship Points record exists for the recent tournament win (50 CP)
-    const cpSnap = await getDocs(championshipPointsCol);
-    if (cpSnap.empty) {
-      const demoRecord: ChampionshipPointRecord = {
-        id: 'cp-sausanavicius-copa-1',
-        memberId: sausanaviciusId,
-        memberName: 'Felipe Sausanavicius',
-        avatarSprite: 'charizard',
-        tournamentName: 'Copa de Liga (League Cup)',
-        tournamentTier: 'Copa de Liga',
-        placement: '1º Lugar (Campeão)',
-        points: 50,
-        date: '2026-09-20',
-        location: 'São Paulo, SP',
-        deckArchetype: 'Charizard ex / Pidgeot ex',
-        notes: '🏆 Campeão da Copa de Liga no fim de semana! +50 Pontos Oficiais (CP) somados para o ranking de campeonatos.',
-        createdAt: new Date().toISOString(),
-        createdById: sausanaviciusId
-      };
-      await setDoc(doc(db, 'championship_points', demoRecord.id), demoRecord);
-    }
-
-    // 3. Ensure Monthly Goals exist for the current month
+    // 2. Ensure Monthly Goals exist for the current month
     const goalsSnap = await getDocs(monthlyGoalsCol);
     if (goalsSnap.empty) {
       const defaultGoals: MonthlyGoals = {

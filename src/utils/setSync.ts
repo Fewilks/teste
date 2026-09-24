@@ -171,7 +171,7 @@ export const SET_SYNC_TABLE: SetSyncEntry[] = [
   { tpci: 'PRE', tcgdexSeries: 'sv', tcgdexSet: 'sv08.5',  ptcgIo: 'sv8pt5', name: 'Prismatic Evolutions', namePt: 'Evoluções Prismáticas',        era: 'sv', regulationMark: 'H' },
   { tpci: 'JTG', tcgdexSeries: 'sv', tcgdexSet: 'sv09',    ptcgIo: 'sv9',    name: 'Journey Together',     namePt: 'Amigos de Jornada',            era: 'sv', regulationMark: 'I' },
   { tpci: 'DRI', tcgdexSeries: 'sv', tcgdexSet: 'sv10',    ptcgIo: 'sv10',   name: 'Destined Rivals',      namePt: 'Rivais Predestinados',         era: 'sv', regulationMark: 'I' },
-  { tpci: 'BLK', tcgdexSeries: 'sv', tcgdexSet: 'sv10.5b', ptcgIo: 'sv10pt5b', name: 'Black Bolt',         namePt: 'Raio Preto',                   era: 'sv', regulationMark: 'I' },
+  { tpci: 'BLK', tcgdexSeries: 'sv', tcgdexSet: 'sv10.5b', ptcgIo: 'sv10pt5b', name: 'Black Bolt',         namePt: 'Raio Negro',                   era: 'sv', regulationMark: 'I' },
   { tpci: 'WHT', tcgdexSeries: 'sv', tcgdexSet: 'sv10.5w', ptcgIo: 'sv10pt5w', name: 'White Flare',        namePt: 'Fogo Branco',                  era: 'sv', regulationMark: 'I' },
 
   // ---------- ME ----------
@@ -307,22 +307,25 @@ export function tcgdexUrl(
 ): string | null {
   const entry = findSet(setQuery);
   if (!entry?.tcgdexSeries || !entry.tcgdexSet || num === undefined || num === null) return null;
-  const clean = String(num).trim().replace(/^#/, '').replace(/^0+/, '') || '1';
-  return `https://assets.tcgdex.net/${lang}/${entry.tcgdexSeries}/${entry.tcgdexSet}/${clean}/high.webp`;
+  const rawClean = String(num).trim().replace(/^#/, '');
+  const clean = rawClean.replace(/^0+/, '') || '1';
+  const isSvOrMe = entry.tcgdexSeries === 'sv' || entry.tcgdexSeries === 'me';
+  const targetNum = isSvOrMe && /^\d+$/.test(clean) ? clean.padStart(3, '0') : clean;
+  return `https://assets.tcgdex.net/${lang}/${entry.tcgdexSeries}/${entry.tcgdexSet}/${targetNum}/high.webp`;
 }
 
 // ============================================================================
 // HIERARQUIA DE IMAGEM (5 níveis + fallback)
 //
 // v3 ORB-SAFE: pokemontcg.io primeiro, Limitless segundo, TCGdex por último.
-// Isso evita o ERR_BLOCKED_BY_ORB que o Cloudflare do TCGdex causa.
+// Sets novos (sem cobertura no pokemontcg.io) priorizam Limitless e TCGdex.
 // ============================================================================
 
 export interface ImageHierarchy {
-  primary: string;    // pokemontcg.io (stable)
-  secondary: string;  // Limitless TCG
-  tertiary: string;   // TCGdex EN (pode falhar com ORB)
-  quaternary: string; // TCGdex PT (pode falhar com ORB)
+  primary: string;    // pokemontcg.io (stable) ou Limitless
+  secondary: string;  // Limitless TCG ou TCGdex
+  tertiary: string;   // TCGdex EN
+  quaternary: string; // TCGdex PT
   fallback: string;   // card back
 }
 
@@ -332,18 +335,23 @@ export function buildImageHierarchy(
   preferredLang: 'pt' | 'en' = 'pt'
 ): ImageHierarchy {
   const entry = findSet(setQuery);
-  const padded = String(num).replace(/^#/, '').replace(/^0+/, '').padStart(3, '0');
-  const clean = String(num).replace(/^#/, '').replace(/^0+/, '') || '1';
+  const rawClean = String(num).replace(/^#/, '');
+  const clean = rawClean.replace(/^0+/, '') || '1';
+  const padded = clean.padStart(3, '0');
+  const isSvOrMe = entry ? (entry.tcgdexSeries === 'sv' || entry.tcgdexSeries === 'me') : false;
+  const tcgdexNum = isSvOrMe && /^\d+$/.test(clean) ? padded : clean;
 
-  const ptIo = entry?.ptcgIo ? `https://images.pokemontcg.io/${entry.ptcgIo}/${clean}.png` : null;
+  const isNewSetWithoutTcgio = entry?.tpci && ['JTG', 'DRI', 'BLK', 'WHT', 'MEE', 'MEG', 'PR-ME', 'PFL', 'ASC', 'POR', 'CRI', 'PBL', '30TH', '30C', '30TH-C'].includes(entry.tpci.toUpperCase());
+
+  const ptIo = (!isNewSetWithoutTcgio && entry?.ptcgIo) ? `https://images.pokemontcg.io/${entry.ptcgIo}/${clean}.png` : null;
   const lim  = entry ? `https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/${entry.tpci.toUpperCase()}/${entry.tpci.toUpperCase()}_${padded}_R_EN_LG.png` : null;
-  const en   = entry?.tcgdexSet ? `https://assets.tcgdex.net/en/${entry.tcgdexSeries}/${entry.tcgdexSet}/${clean}/high.webp` : null;
-  const pt   = entry?.tcgdexSet ? `https://assets.tcgdex.net/pt/${entry.tcgdexSeries}/${entry.tcgdexSet}/${clean}/high.webp` : null;
+  const en   = entry?.tcgdexSet ? `https://assets.tcgdex.net/en/${entry.tcgdexSeries}/${entry.tcgdexSet}/${tcgdexNum}/high.webp` : null;
+  const pt   = entry?.tcgdexSet ? `https://assets.tcgdex.net/pt/${entry.tcgdexSeries}/${entry.tcgdexSet}/${tcgdexNum}/high.webp` : null;
 
-  // ORB-SAFE ORDER: pokemontcg.io → Limitless → TCGdex
-  const ordered = preferredLang === 'pt'
-    ? [ptIo, lim, pt, en]
-    : [ptIo, lim, en, pt];
+  // Se o set é moderno (JTG, DRI, WHT, BLK, Mega), prioriza Limitless e TCGdex pois pokemontcg.io ainda não possui
+  const ordered = isNewSetWithoutTcgio
+    ? (preferredLang === 'pt' ? [lim, pt, en, ptIo] : [lim, en, pt, ptIo])
+    : (preferredLang === 'pt' ? [ptIo, lim, pt, en] : [ptIo, lim, en, pt]);
 
   const nonNull = ordered.filter(Boolean) as string[];
   return {

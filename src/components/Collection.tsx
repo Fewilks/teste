@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db, collectionCol } from '../lib/firebase';
+import { db, collectionCol, purgeAllDataExceptDecks } from '../lib/firebase';
 import { getDocs, query, where, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { Member, CardItem } from '../types';
 import { 
@@ -13,7 +13,11 @@ import {
   Heart,
   PlusCircle,
   X,
-  Info
+  Info,
+  BookOpen,
+  AlertTriangle,
+  RefreshCw,
+  CheckCircle2
 } from 'lucide-react';
 import PokemonSprite from './PokemonSprite';
 import PokemonLoader from './PokemonLoader';
@@ -66,12 +70,53 @@ export default function Collection({ currentMember }: CollectionProps) {
     fetchSets();
   }, []);
 
-  // Collection tab state: 'my' (Minha Coleção) or 'team' (Acervo do Time)
-  const [collectionTab, setCollectionTab] = useState<'my' | 'team'>('my');
+  // Collection tab state: 'my' (Minha Coleção), 'team' (Acervo do Time), or 'explorer' (Explorador Oficial de Coleções)
+  const [collectionTab, setCollectionTab] = useState<'my' | 'team' | 'explorer'>('my');
+  const [explorerSet, setExplorerSet] = useState<string>('DRI');
+  const [explorerCards, setExplorerCards] = useState<any[]>([]);
+  const [loadingExplorer, setLoadingExplorer] = useState(false);
+  const [showPurgeCollectionModal, setShowPurgeCollectionModal] = useState(false);
+  const [purgingCollection, setPurgingCollection] = useState(false);
+
+  // Load complete set cards for the official explorer
+  useEffect(() => {
+    async function loadExplorerSet() {
+      if (collectionTab !== 'explorer' && !explorerSet) return;
+      try {
+        setLoadingExplorer(true);
+        const res = await fetch(`/api/pokemon/search?set=${encodeURIComponent(explorerSet)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setExplorerCards(normalizeCollectionCards(data));
+          }
+        }
+      } catch (err) {
+        console.error('Error loading explorer set:', err);
+      } finally {
+        setLoadingExplorer(false);
+      }
+    }
+    loadExplorerSet();
+  }, [explorerSet, collectionTab]);
+
+  const handlePurgeAllCollection = async () => {
+    try {
+      setPurgingCollection(true);
+      await purgeAllDataExceptDecks();
+      setCollectionCards([]);
+      setShowPurgeCollectionModal(false);
+    } catch (err) {
+      console.error('Error purging collection:', err);
+    } finally {
+      setPurgingCollection(false);
+    }
+  };
 
   // Load user collection or whole team collection
   useEffect(() => {
     async function fetchCollection() {
+      if (collectionTab === 'explorer') return;
       try {
         setLoading(true);
         const q = collectionTab === 'my'
@@ -258,38 +303,52 @@ export default function Collection({ currentMember }: CollectionProps) {
           </p>
         </div>
         
-        <button
-          id="btn-add-card-to-collection"
-          onClick={() => {
-            setSelectedCard(null);
-            setSearchQuery('');
-            setSelectedSet('');
-            setSearchResults(MODERN_CARDS_CATALOG.slice(0, 16));
-            setShowAddModal(true);
-          }}
-          className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg font-bold text-sm flex items-center gap-2 shadow-lg shadow-purple-950/40 cursor-pointer transition-all duration-300 transform hover:-translate-y-0.5 shrink-0"
-        >
-          <PlusCircle className="w-5 h-5" /> Adicionar Nova Carta
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          {collectionCards.length > 0 && (
+            <button
+              id="btn-purge-collection-direct"
+              onClick={() => setShowPurgeCollectionModal(true)}
+              className="px-3.5 py-2 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 hover:border-rose-500/50 text-rose-300 hover:text-white rounded-lg font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-md"
+              title="Zerar acervo de coleção mantendo os decks intactos"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>Zerar Coleção (Manter Decks)</span>
+            </button>
+          )}
+
+          <button
+            id="btn-add-card-to-collection"
+            onClick={() => {
+              setSelectedCard(null);
+              setSearchQuery('');
+              setSelectedSet('');
+              setSearchResults(MODERN_CARDS_CATALOG.slice(0, 16));
+              setShowAddModal(true);
+            }}
+            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg font-bold text-sm flex items-center gap-2 shadow-lg shadow-purple-950/40 cursor-pointer transition-all duration-300 transform hover:-translate-y-0.5 shrink-0"
+          >
+            <PlusCircle className="w-5 h-5" /> Adicionar Nova Carta
+          </button>
+        </div>
       </div>
 
       {/* Tab Selectors */}
-      <div className="flex gap-2 bg-slate-900/40 p-1.5 rounded-xl border border-slate-800/65 max-w-sm">
+      <div className="flex flex-wrap gap-2 bg-slate-900/50 p-1.5 rounded-xl border border-slate-800 max-w-xl">
         <button
           id="collection-tab-my"
           onClick={() => setCollectionTab('my')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+          className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
             collectionTab === 'my'
               ? 'bg-purple-600 text-white shadow'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
           }`}
         >
-          👤 Minha Coleção
+          👤 Minha Coleção ({collectionTab === 'my' ? collectionCards.length : '...'})
         </button>
         <button
           id="collection-tab-team"
           onClick={() => setCollectionTab('team')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+          className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
             collectionTab === 'team'
               ? 'bg-purple-600 text-white shadow'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
@@ -297,10 +356,152 @@ export default function Collection({ currentMember }: CollectionProps) {
         >
           👥 Acervo do Time
         </button>
+        <button
+          id="collection-tab-explorer"
+          onClick={() => setCollectionTab('explorer')}
+          className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            collectionTab === 'explorer'
+              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+          }`}
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          <span>Explorador de Coleções</span>
+        </button>
       </div>
 
-      {/* 2. Collection Content Grid */}
-      {loading ? (
+      {/* 2. Main Tab Contents */}
+      {collectionTab === 'explorer' ? (
+        /* Explorador de Coleções Completas (Rivais Predestinados, Amigos de Jornada, Fogo Branco, etc.) */
+        <div className="space-y-6" id="explorer-view">
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-purple-400" />
+                  <span>Explorador de Coleções Oficiais Pokémon TCG</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Navegue por todas as cartas das coleções mais recentes com scans oficiais e traduções em português.
+                </p>
+              </div>
+
+              {/* Set selector */}
+              <div className="w-full sm:w-72 shrink-0">
+                <select
+                  id="explorer-set-select"
+                  value={explorerSet}
+                  onChange={(e) => setExplorerSet(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-purple-500/40 rounded-xl text-white text-sm font-bold outline-none cursor-pointer focus:border-purple-400"
+                >
+                  {sets.map((s: any, idx: number) => (
+                    <option key={`exp-set-${s.id || idx}`} value={s.id}>
+                      {s.name} ({s.id ? String(s.id).toUpperCase() : ''})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Quick Set Navigation Pills */}
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-850">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Acesso Rápido:</span>
+              {[
+                { label: 'Rivais Predestinados (DRI)', code: 'DRI' },
+                { label: 'Amigos de Jornada (JTG)', code: 'JTG' },
+                { label: 'Fogo Branco (WHT)', code: 'WHT' },
+                { label: 'Raio Preto (BLK)', code: 'BLK' },
+                { label: 'Evoluções Prismáticas (PRE)', code: 'PRE' },
+                { label: 'Celebrações 30 Anos (30TH)', code: '30TH' }
+              ].map((pill) => (
+                <button
+                  key={pill.code}
+                  type="button"
+                  onClick={() => setExplorerSet(pill.code)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                    explorerSet.toUpperCase() === pill.code
+                      ? 'bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-950/40'
+                      : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
+                  }`}
+                >
+                  {pill.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Card Counter summary banner */}
+            <div className="flex items-center justify-between text-xs text-slate-300 bg-slate-950/60 px-4 py-2.5 rounded-xl border border-slate-850">
+              <span className="font-medium">
+                Exibindo <strong className="text-white font-mono">{explorerCards.length} cartas</strong> da expansão selecionada
+              </span>
+              <span className="text-[11px] text-purple-400 font-mono font-bold">
+                Status: 100% Completa
+              </span>
+            </div>
+          </div>
+
+          {/* Explorer Cards Grid */}
+          {loadingExplorer ? (
+            <PokemonLoader 
+              pokemon="mew" 
+              title="Carregando cartas da coleção..." 
+              subtitle="Buscando todos os scans e informações em português..." 
+            />
+          ) : explorerCards.length === 0 ? (
+            <div className="text-center py-16 bg-slate-900/30 rounded-2xl border border-slate-800 p-8">
+              <p className="text-slate-400 text-sm">Nenhuma carta encontrada para esta coleção.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4" id="explorer-grid">
+              {explorerCards.map((card, idx) => (
+                <div
+                  key={`explorer-card-${card.id || idx}`}
+                  className="bg-slate-900/50 border border-slate-800 hover:border-purple-500/50 rounded-2xl p-3 flex flex-col justify-between group transition-all duration-300 hover:shadow-lg"
+                >
+                  <div className="aspect-[3/4] flex items-center justify-center relative mb-2 bg-slate-950/40 rounded-xl overflow-hidden p-1">
+                    <img 
+                      src={getAuthenticCardImageUrl(card)} 
+                      alt={card.name} 
+                      className="max-h-full max-w-full object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-300" 
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        const hierarchy = getCardScanHierarchy(card);
+                        if (e.currentTarget.src !== hierarchy.secondary && hierarchy.secondary !== POKEMON_CARD_BACK) {
+                          e.currentTarget.src = hierarchy.secondary;
+                        } else {
+                          e.currentTarget.src = POKEMON_CARD_BACK;
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-[10px] font-mono font-bold text-purple-300 bg-purple-950/80 px-1.5 py-0.5 rounded border border-purple-500/30">
+                        {card.tpciCode || `${card.setCode || ''} ${card.setNumber || ''}`}
+                      </span>
+                    </div>
+
+                    <h4 className="text-xs font-bold text-white truncate" title={card.name}>
+                      {card.name}
+                    </h4>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenAdd(card)}
+                      className="w-full py-1.5 px-2 bg-purple-600/80 hover:bg-purple-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-sm"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Adicionar</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : loading ? (
         <PokemonLoader 
           pokemon="charizard" 
           title="Carregando acervo de cartas..." 
@@ -452,14 +653,17 @@ export default function Collection({ currentMember }: CollectionProps) {
 
       {/* 3. Add Card Overlay Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="add-card-modal">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 z-50 animate-fade-in overflow-y-auto" id="add-card-modal">
+          <div className="bg-slate-900 border border-slate-700/80 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] sm:max-h-[88vh] flex flex-col my-auto">
             
             {/* Modal Header */}
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-purple-900/40 to-slate-900">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🃏</span>
-                <h3 className="text-base font-bold text-white">Adicionar Carta ao seu Acervo</h3>
+            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">🃏</span>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-white">Adicionar Carta ao seu Acervo</h3>
+                  <p className="text-xs text-slate-400">Pesquise por nome oficial ou selecione uma expansão completa</p>
+                </div>
               </div>
               <button 
                 id="close-modal-x"
@@ -469,34 +673,34 @@ export default function Collection({ currentMember }: CollectionProps) {
                   setSearchResults([]);
                   setSearchQuery('');
                 }}
-                className="text-slate-400 hover:text-white transition-all cursor-pointer"
+                className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-all cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Modal Search form */}
-            <div className="p-5 border-b border-slate-800 bg-slate-950/50">
+            {/* Modal Search form & Quick Tags */}
+            <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950/60 shrink-0 space-y-3">
               <form onSubmit={handleDatabaseSearch} className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-450" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     id="modal-card-search-input"
                     type="text"
-                    placeholder="Busque cartas em inglês ou português (ex: Charizard ex, Iono, Arven...)"
+                    placeholder="Busque cartas em inglês ou português (ex: Charizard, Iono, Arven...)"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-800 focus:border-purple-500 rounded-lg text-white text-sm outline-none font-sans"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 focus:border-purple-500 rounded-xl text-white text-sm outline-none font-medium"
                   />
                 </div>
                 
                 {/* Collection Filter */}
-                <div className="w-full sm:w-56 shrink-0">
+                <div className="w-full sm:w-60 shrink-0">
                   <select
                     id="modal-set-filter"
                     value={selectedSet}
                     onChange={(e) => setSelectedSet(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 focus:border-purple-500 rounded-lg text-white text-sm outline-none font-sans cursor-pointer"
+                    className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 focus:border-purple-500 rounded-xl text-white text-sm outline-none font-medium cursor-pointer"
                   >
                     <option value="">Todas as Coleções</option>
                     {sets.map((s: any, idx: number) => (
@@ -511,28 +715,57 @@ export default function Collection({ currentMember }: CollectionProps) {
                   id="modal-search-submit"
                   type="submit"
                   disabled={searching}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-800 text-white rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                  className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:bg-slate-800 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 cursor-pointer shrink-0 shadow-md"
                 >
-                  {searching ? 'Buscando...' : 'Pesquisar'}
+                  {searching ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Buscando...</span>
+                    </>
+                  ) : (
+                    <span>Pesquisar</span>
+                  )}
                 </button>
               </form>
-              <div className="text-[10px] text-slate-500 mt-2 flex items-center gap-1">
-                <Info className="w-3 h-3 text-purple-400 shrink-0" />
-                <span>As cartas adicionadas são sincronizadas com a base de dados global do Pokémon TCG.</span>
+
+              {/* Quick Set Tags */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] uppercase font-bold text-slate-400 font-mono">Coleções Recentes:</span>
+                {[
+                  { label: 'Rivais Predestinados', code: 'DRI' },
+                  { label: 'Amigos de Jornada', code: 'JTG' },
+                  { label: 'Fogo Branco', code: 'WHT' },
+                  { label: 'Raio Preto', code: 'BLK' },
+                  { label: 'Evoluções Prismáticas', code: 'PRE' },
+                  { label: '30 Anos', code: '30TH' }
+                ].map(tag => (
+                  <button
+                    key={tag.code}
+                    type="button"
+                    onClick={() => setSelectedSet(tag.code)}
+                    className={`text-[11px] px-2.5 py-0.5 rounded-lg border font-bold transition-all cursor-pointer ${
+                      selectedSet.toUpperCase() === tag.code
+                        ? 'bg-purple-600 text-white border-purple-400'
+                        : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
+                    }`}
+                  >
+                    {tag.label}
+                  </button>
+                ))}
               </div>
             </div>
 
             {/* Modal Body: Grid search results or card details form */}
-            <div className="p-5 overflow-y-auto flex-1 bg-slate-900/50">
+            <div className="p-5 overflow-y-auto flex-1 bg-slate-900/40 overscroll-contain">
               
               {/* If we have selected a card, show options to save */}
               {selectedCard ? (
                 <div className="flex flex-col sm:flex-row gap-6 animate-fade-in" id="add-details-form">
-                  <div className="w-full sm:w-1/3 flex justify-center">
+                  <div className="w-full sm:w-1/3 flex justify-center shrink-0">
                     <img 
                       src={getAuthenticCardImageUrl(selectedCard)} 
                       alt={selectedCard.name} 
-                      className="max-h-64 object-contain rounded-lg drop-shadow-lg" 
+                      className="max-h-72 object-contain rounded-xl drop-shadow-xl border border-slate-800 bg-slate-950/50 p-1" 
                       referrerPolicy="no-referrer"
                       onError={(e) => {
                         e.currentTarget.onerror = null;
@@ -546,33 +779,35 @@ export default function Collection({ currentMember }: CollectionProps) {
                     />
                   </div>
                   
-                  <div className="flex-1 space-y-6">
+                  <div className="flex-1 space-y-5">
                     <div>
-                      <span className="text-[10px] uppercase font-mono font-bold text-purple-400">{selectedCard.setName || 'Coleção'}</span>
-                      <h4 className="text-xl font-bold text-white mt-1">{selectedCard.name}</h4>
-                      <div className="card-data-field text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2">
-                        <span>Coleção: <strong className="text-slate-200">{selectedCard.setName}</strong></span>
-                        <span>•</span>
+                      <span className="text-[10px] uppercase font-mono font-bold text-purple-400 bg-purple-950/60 px-2 py-0.5 rounded border border-purple-500/30">
+                        {selectedCard.setName || 'Coleção'}
+                      </span>
+                      <h4 className="text-xl font-bold text-white mt-2">{selectedCard.name}</h4>
+                      <div className="card-data-field text-xs text-slate-300 mt-1 flex flex-wrap items-center gap-2">
                         <span>Código Oficial PTCGL: <strong className="font-mono text-purple-300 font-bold bg-purple-950/80 px-2 py-0.5 rounded border border-purple-500/30">{getPTCGLId(selectedCard)}</strong></span>
                       </div>
                     </div>
 
                     {/* Quantity selection */}
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-slate-300 uppercase">Quantidade de cópias:</label>
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-200 uppercase tracking-wider">Quantidade de cópias:</label>
                       <div className="flex items-center gap-3">
                         <button 
                           id="btn-qty-dec"
+                          type="button"
                           onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                          className="w-10 h-10 bg-slate-800 hover:bg-slate-700 rounded-lg text-white font-extrabold flex items-center justify-center cursor-pointer"
+                          className="w-10 h-10 bg-slate-800 hover:bg-slate-700 rounded-xl text-white font-extrabold flex items-center justify-center cursor-pointer border border-slate-700"
                         >
                           -
                         </button>
                         <span className="text-xl font-bold font-mono text-white w-12 text-center">{quantity}</span>
                         <button 
                           id="btn-qty-inc"
+                          type="button"
                           onClick={() => setQuantity(q => q + 1)}
-                          className="w-10 h-10 bg-slate-800 hover:bg-slate-700 rounded-lg text-white font-extrabold flex items-center justify-center cursor-pointer"
+                          className="w-10 h-10 bg-slate-800 hover:bg-slate-700 rounded-xl text-white font-extrabold flex items-center justify-center cursor-pointer border border-slate-700"
                         >
                           +
                         </button>
@@ -580,37 +815,39 @@ export default function Collection({ currentMember }: CollectionProps) {
                     </div>
 
                     {/* Share option */}
-                    <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-850 space-y-2">
+                    <div className="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
                       <label className="flex items-start gap-3 cursor-pointer">
                         <input
                           id="checkbox-is-lendable"
                           type="checkbox"
                           checked={isLendable}
                           onChange={(e) => setIsLendable(e.target.checked)}
-                          className="mt-1 accent-purple-600 rounded"
+                          className="mt-0.5 accent-purple-600 rounded"
                         />
                         <div>
-                          <span className="text-sm font-bold text-white block">Compartilhar com o time Spirits</span>
-                          <span className="text-xs text-slate-400">Permitir que outros membros solicitem empréstimo desta carta. Ninguém perde cartas, o portal rastreia o histórico!</span>
+                          <span className="text-xs font-bold text-white block">Disponibilizar para empréstimo ao time</span>
+                          <span className="text-[11px] text-slate-400">Outros membros poderão solicitar esta carta para treinos ou torneios.</span>
                         </div>
                       </label>
                     </div>
 
                     {/* Submit choices */}
-                    <div className="flex gap-3 pt-4">
-                      <button
-                        id="btn-submit-add-card"
-                        onClick={handleAddCardToDb}
-                        className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm rounded-xl cursor-pointer"
-                      >
-                        Salvar na Minha Coleção
-                      </button>
+                    <div className="flex gap-3 pt-2">
                       <button
                         id="btn-cancel-add-card"
+                        type="button"
                         onClick={() => setSelectedCard(null)}
-                        className="px-5 py-3 bg-slate-850 hover:bg-slate-800 text-slate-300 font-semibold text-sm rounded-xl cursor-pointer"
+                        className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl cursor-pointer border border-slate-700"
                       >
                         Voltar para Busca
+                      </button>
+                      <button
+                        id="btn-submit-add-card"
+                        type="button"
+                        onClick={handleAddCardToDb}
+                        className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm rounded-xl cursor-pointer shadow-lg"
+                      >
+                        Salvar na Minha Coleção
                       </button>
                     </div>
 
@@ -618,26 +855,31 @@ export default function Collection({ currentMember }: CollectionProps) {
                 </div>
               ) : (
                 /* Show search results grid */
-                <div className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+                    <span>Resultados: <strong className="text-white">{searchResults.length} cartas</strong></span>
+                    {selectedSet && <span className="font-mono text-purple-400">Filtro: {selectedSet}</span>}
+                  </div>
+
                   {searching ? (
-                    <div className="text-center py-10 flex flex-col items-center">
+                    <div className="text-center py-12 flex flex-col items-center">
                       <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-slate-400 text-sm mt-3 font-mono">Pesquisando base de dados nacional/internacional...</p>
+                      <p className="text-slate-400 text-sm mt-3 font-mono">Carregando cartas oficiais com scans de alta resolução...</p>
                     </div>
                   ) : searchResults.length === 0 ? (
-                    <div className="text-center py-12 text-slate-500 text-sm">
-                      Digite o nome de uma carta acima (ex: "Gardevoir", "Iono") e clique em Pesquisar.
+                    <div className="text-center py-12 text-slate-400 text-sm bg-slate-950/40 rounded-2xl border border-slate-850">
+                      Nenhuma carta encontrada. Escolha uma das coleções acima ou digite outro nome.
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4" id="modal-search-results">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5" id="modal-search-results">
                       {searchResults.map((card, idx) => (
                         <div
                           key={`search-card-${card.id || 'search'}-${idx}`}
                           onClick={() => handleOpenAdd(card)}
-                          className="bg-slate-950/60 hover:bg-slate-950 p-2.5 rounded-xl border border-slate-850 hover:border-purple-500/50 cursor-pointer transition-all duration-300 group flex flex-col justify-between"
+                          className="bg-slate-950/60 hover:bg-slate-950 p-2.5 rounded-xl border border-slate-800 hover:border-purple-500/50 cursor-pointer transition-all duration-200 group flex flex-col justify-between hover:shadow-lg"
                           id={`search-result-${card.id || idx}`}
                         >
-                          <div className="aspect-[3/4] flex items-center justify-center relative mb-2">
+                          <div className="aspect-[3/4] flex items-center justify-center relative mb-2 bg-slate-900/40 rounded-lg overflow-hidden p-1">
                             <img 
                               src={getAuthenticCardImageUrl(card)} 
                               alt={card.name} 
@@ -654,9 +896,9 @@ export default function Collection({ currentMember }: CollectionProps) {
                               }}
                             />
                           </div>
-                          <div>
-                            <div className="text-white font-bold text-xs truncate group-hover:text-purple-400 transition-colors">{card.name}</div>
-                            <div className="card-data-field text-[9px] text-slate-400 mt-0.5 flex items-center justify-between">
+                          <div className="space-y-1">
+                            <div className="text-white font-bold text-xs truncate group-hover:text-purple-300 transition-colors">{card.name}</div>
+                            <div className="card-data-field text-[10px] text-slate-400 flex items-center justify-between">
                               <span className="truncate max-w-[85px]">{card.setName}</span>
                               <span className="font-mono text-purple-300 font-bold bg-purple-950/60 px-1 py-0.2 rounded border border-purple-500/20 shrink-0">
                                 {getPTCGLId(card)}
@@ -672,6 +914,80 @@ export default function Collection({ currentMember }: CollectionProps) {
 
             </div>
 
+            {/* Modal Footer */}
+            <div className="px-5 py-3 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between text-xs text-slate-400 shrink-0">
+              <span className="flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5 text-purple-400" />
+                <span>Base de dados TCGdex & Limitless integrada</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddModal(false);
+                  setSelectedCard(null);
+                }}
+                className="px-4 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Purge Collection Confirmation Modal */}
+      {showPurgeCollectionModal && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in" id="purge-collection-modal">
+          <div className="bg-slate-900 border border-rose-500/40 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4 animate-scale-up">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-rose-950/50 border border-rose-500/30 rounded-xl text-rose-400">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Zerar Acervo de Coleção</h3>
+                <p className="text-xs text-rose-300">Mantendo seus baralhos e decks cadastrados</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-300 leading-relaxed bg-slate-950/50 p-4 rounded-xl border border-slate-850">
+              <p>
+                Esta ação irá remover todas as cartas cadastradas no acervo do time ({collectionCards.length} cartas).
+              </p>
+              <p className="text-emerald-300 font-semibold flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Todos os seus decks cadastrados permanecerão 100% salvos e protegidos.</span>
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowPurgeCollectionModal(false)}
+                disabled={purgingCollection}
+                className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handlePurgeAllCollection}
+                disabled={purgingCollection}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-bold shadow-lg shadow-rose-950/50 transition-all cursor-pointer flex items-center gap-2"
+              >
+                {purgingCollection ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Zerando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Confirmar e Zerar Coleção</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

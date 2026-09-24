@@ -4,6 +4,7 @@ import {
   db, 
   seedDatabaseIfEmpty, 
   seedTournamentsIfEmpty, 
+  purgeAllDataExceptDecks,
   purgeTestDataKeepCore, 
   ensureInitialChampionshipData,
   membersCol, 
@@ -37,7 +38,11 @@ import {
   Lock,
   FileText,
   CalendarDays,
-  Flame
+  Flame,
+  Trash2,
+  AlertTriangle,
+  CheckCircle2,
+  RefreshCw
 } from 'lucide-react';
 import PokemonSprite from './components/PokemonSprite';
 import PokemonLoader from './components/PokemonLoader';
@@ -62,19 +67,23 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [showProfileSwitcher, setShowProfileSwitcher] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
+  const [showPurgeModal, setShowPurgeModal] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [purgeToast, setPurgeToast] = useState<string | null>(null);
 
   // Bootstrap Firebase Firestore and retrieve members list on load
   const loadPortalData = async (userUid?: string) => {
     try {
-      // Seed Firestore with rich demo data if empty
+      // Seed Firestore with core data if completely empty
       await seedDatabaseIfEmpty();
       await seedTournamentsIfEmpty();
       await ensureInitialChampionshipData();
 
-      // One-time automatic purge of test data (matches, tournaments, loans, logs), preserving decks, members, and collection
-      if (localStorage.getItem('spirits_data_purged_production_v2') !== 'true') {
-        await purgeTestDataKeepCore();
-        localStorage.setItem('spirits_data_purged_production_v2', 'true');
+      // Automatic data purge as explicitly requested: wipe matches, collection, tournaments, loans, logs, CP, KEEPING ONLY DECKS
+      const PURGE_FLAG = 'spirits_purge_all_v7_clean_everything_except_decks';
+      if (localStorage.getItem(PURGE_FLAG) !== 'true') {
+        await purgeAllDataExceptDecks();
+        localStorage.setItem(PURGE_FLAG, 'true');
       }
 
       // Retrieve Spirits roster
@@ -232,6 +241,23 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  const handleExecutePurge = async () => {
+    try {
+      setPurging(true);
+      const res = await purgeAllDataExceptDecks();
+      await loadPortalData(currentUser?.uid);
+      setShowPurgeModal(false);
+      setPurgeToast(`Dados zerados com sucesso! ${res.deletedMatches} partidas, ${res.deletedCollection} cartas de coleção e ${res.deletedTournaments} campeonatos removidos. Todos os seus decks foram preservados!`);
+      setTimeout(() => setPurgeToast(null), 6000);
+    } catch (err) {
+      console.error('Error executing purge:', err);
+      setPurgeToast('Erro ao zerar dados. Verifique a conexão.');
+      setTimeout(() => setPurgeToast(null), 4000);
+    } finally {
+      setPurging(false);
+    }
+  };
+
   const handleSwitchProfile = (memberId: string) => {
     const selected = members.find(m => m.id === memberId);
     if (selected) {
@@ -346,12 +372,22 @@ export default function App() {
           </nav>
         </div>
 
-        {/* Logout Button and Footer info brand */}
-        <div className="space-y-4 mt-auto pt-4 border-t border-slate-850/60">
+        {/* Purge / Reset and Logout Section */}
+        <div className="space-y-3 mt-auto pt-4 border-t border-slate-850/60">
+          <button
+            id="sidebar-purge-data-btn"
+            onClick={() => setShowPurgeModal(true)}
+            className="w-full px-3 py-2 bg-rose-950/30 hover:bg-rose-900/50 text-rose-300 hover:text-rose-200 border border-rose-900/40 hover:border-rose-500/50 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm group"
+            title="Zerar partidas, coleção, torneios e logs, mantendo decks"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-400 group-hover:scale-110 transition-transform" />
+            <span>Zerar Dados (Manter Decks)</span>
+          </button>
+
           <button
             id="sidebar-logout-btn"
             onClick={() => signOut(auth)}
-            className="w-full px-4 py-2 bg-slate-950/40 hover:bg-red-950/20 text-slate-400 hover:text-red-400 border border-slate-850 hover:border-red-500/20 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md group"
+            className="w-full px-4 py-2 bg-slate-950/40 hover:bg-slate-800/60 text-slate-400 hover:text-white border border-slate-850 hover:border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md group"
           >
             <span>Sair do Portal</span>
           </button>
@@ -366,6 +402,87 @@ export default function App() {
         </div>
 
       </aside>
+
+      {/* Global Toast Notification */}
+      {purgeToast && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-md bg-slate-900 border border-emerald-500/50 text-emerald-300 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-fade-in backdrop-blur-md">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          <p className="text-xs font-medium leading-relaxed">{purgeToast}</p>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Data Purge */}
+      {showPurgeModal && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-slate-900 border border-rose-500/40 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto">
+            <div className="p-5 border-b border-slate-800 bg-rose-950/40 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-rose-900/60 border border-rose-700/50 rounded-xl text-rose-300">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Zerar Dados do Spirits</h3>
+                  <p className="text-xs text-rose-300">Limpeza completa mantendo os decks intactos</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !purging && setShowPurgeModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-sm text-slate-300 leading-relaxed">
+              <p>
+                Esta ação irá <strong className="text-white">remover e zerar</strong>:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 text-xs text-slate-300">
+                <li>Todas as partidas registradas e histórico de winrate</li>
+                <li>Todas as cartas da coleção compartilhada do acervo</li>
+                <li>Todos os campeonatos e rodadas registrados</li>
+                <li>Todos os empréstimos ativos ou pendentes</li>
+                <li>Todos os replays e logs de partidas do TrainerLog</li>
+                <li>Histórico de pontuação oficial (CP) e vitórias/derrotas nos perfis</li>
+              </ul>
+              <div className="p-3.5 bg-emerald-950/30 border border-emerald-500/30 rounded-xl flex items-center gap-3 text-xs text-emerald-300">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                <span><strong>GARANTIA TOTAL:</strong> Todos os seus baralhos e listas de decks cadastrados serão <strong>100% PRESERVADOS</strong> e não sofrerão nenhuma alteração.</span>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-800 bg-slate-950/80 flex items-center justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowPurgeModal(false)}
+                disabled={purging}
+                className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleExecutePurge}
+                disabled={purging}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-bold shadow-lg shadow-rose-950/50 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+              >
+                {purging ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                    <span>Zerando dados...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Sim, Zerar Tudo (Manter Decks)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2. MAIN CORE STAGE SHEET */}
       <main className="flex-1 bg-slate-950 p-6 md:p-8 overflow-y-auto max-h-screen" id="main-stage">
