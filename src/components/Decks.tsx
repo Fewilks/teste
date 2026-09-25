@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import PokemonSprite from './PokemonSprite';
 import PokemonLoader from './PokemonLoader';
+import ModalPortal from './ModalPortal';
 import { getArchetypeSprites } from './Matches';
 import { fallbackMetaDecks } from '../data/fallbackDecks';
 import { fetchLiveMetaDecks, getStoredMetaDecks } from '../services/limitlessApi';
@@ -1013,9 +1014,11 @@ export default function Decks({ currentMember }: DecksProps) {
       )}
 
       {/* Import Modal */}
-      {showImportModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 z-50 animate-fade-in overflow-y-auto" id="import-deck-modal">
-          <div className="bg-slate-900 border border-slate-700/80 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] sm:max-h-[88vh] flex flex-col my-auto">
+      <ModalPortal isOpen={showImportModal} onClose={() => {
+        setShowImportModal(false);
+        setEditingDeck(null);
+      }} id="import-deck-modal">
+        <div className="bg-slate-900 border border-slate-700/80 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden max-h-[90dvh] flex flex-col my-auto animate-fade-in">
             
             {/* Header */}
             <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
@@ -1176,13 +1179,12 @@ Pokémon: 3
             </form>
 
           </div>
-        </div>
-      )}
+      </ModalPortal>
 
       {/* Modal para Escolher os 2 Sprites Principais a partir da Leitura de Cartas do Baralho Limitless */}
-      {spriteModalDeck && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="choose-sprites-modal">
-          <div className="bg-slate-900 border border-purple-500/40 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+      <ModalPortal isOpen={!!spriteModalDeck} onClose={() => setSpriteModalDeck(null)} id="choose-sprites-modal">
+        {spriteModalDeck && (
+          <div className="bg-slate-900 border border-purple-500/40 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden max-h-[90dvh] flex flex-col my-auto animate-fade-in">
             {/* Modal Header */}
             <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-purple-950/60 to-slate-900">
               <div className="flex items-center gap-2.5">
@@ -1389,8 +1391,8 @@ Pokémon: 3
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </ModalPortal>
 
     </div>
   );

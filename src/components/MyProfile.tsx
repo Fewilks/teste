@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
-import { Member } from '../types';
+import { db, championshipPointsCol, addChampionshipPoints, deleteChampionshipPointRecord, purgeTestDataKeepCore } from '../lib/firebase';
+import { doc, updateDoc, getDocs } from 'firebase/firestore';
+import { Member, ChampionshipPointRecord } from '../types';
 import { getRoleBadge } from '../utils';
 import { 
   User, 
@@ -10,24 +10,24 @@ import {
   Award, 
   ShieldAlert, 
   CheckCircle, 
-  Lock, 
-  Unlock,
-  Save,
-  HelpCircle,
-  TrendingUp,
-  LayoutDashboard,
-  Layers,
-  ArrowLeftRight,
-  Swords,
+  Save, 
+  TrendingUp, 
+  Trash2, 
+  CheckCircle2, 
+  AlertOctagon,
   Trophy,
-  Trash2,
-  RefreshCw,
-  CheckCircle2,
-  AlertOctagon
+  Target,
+  Plus,
+  Calendar,
+  MapPin,
+  X,
+  Medal,
+  Sparkles,
+  ExternalLink
 } from 'lucide-react';
 import PokemonSprite from './PokemonSprite';
-import { POPULAR_POKEMON_AVATARS, PokemonAvatarOption } from '../utils/pokemonSprites';
-import { purgeTestDataKeepCore } from '../lib/firebase';
+import { POPULAR_POKEMON_AVATARS } from '../utils/pokemonSprites';
+import ModalPortal from './ModalPortal';
 
 interface MyProfileProps {
   currentMember: Member;
@@ -35,20 +35,192 @@ interface MyProfileProps {
   onMemberUpdated: () => void;
 }
 
+// Presets oficiais de Championship Points do Play! Pokémon
+const CP_TIER_PRESETS: Record<string, Record<string, number>> = {
+  'Copa de Liga': {
+    '1º Lugar (Campeão)': 50,
+    '2º Lugar (Vice)': 40,
+    'Top 4': 32,
+    'Top 8': 25,
+    'Top 16': 20
+  },
+  'Desafio de Liga': {
+    '1º Lugar (Campeão)': 15,
+    '2º Lugar (Vice)': 12,
+    'Top 4': 10,
+    'Top 8': 8
+  },
+  'Regional': {
+    '1º Lugar (Campeão)': 200,
+    '2º Lugar (Vice)': 160,
+    'Top 4': 130,
+    'Top 8': 100,
+    'Top 16': 80,
+    'Top 32': 60,
+    'Top 64': 40
+  },
+  'Special Event': {
+    '1º Lugar (Campeão)': 200,
+    '2º Lugar (Vice)': 160,
+    'Top 4': 130,
+    'Top 8': 100,
+    'Top 16': 80
+  },
+  'Internacional': {
+    '1º Lugar (Campeão)': 500,
+    '2º Lugar (Vice)': 400,
+    'Top 4': 320,
+    'Top 8': 250,
+    'Top 16': 200,
+    'Top 32': 160
+  }
+};
+
 export default function MyProfile({ currentMember, setCurrentMember, onMemberUpdated }: MyProfileProps) {
   const [name, setName] = useState(currentMember.name || '');
   const [nickname, setNickname] = useState(currentMember.nickname || '');
   const [avatarSprite, setAvatarSprite] = useState(currentMember.avatarSprite || 'pikachu');
   const [role, setRole] = useState<'pokeball' | 'greatball' | 'ultraball' | 'masterball' | 'Premium ball'>(currentMember.role as any || 'pokeball');
   
+  // CP & Score Goals
+  const [officialPoints, setOfficialPoints] = useState<number>(currentMember.officialPoints || 0);
+  const [cpTarget, setCpTarget] = useState<number>(currentMember.cpTarget || 100);
+  const [cpRecords, setCpRecords] = useState<ChampionshipPointRecord[]>([]);
+  const [loadingCp, setLoadingCp] = useState<boolean>(false);
+  
+  // Modal states
+  const [showAddCpModal, setShowAddCpModal] = useState<boolean>(false);
+  const [savingCp, setSavingCp] = useState<boolean>(false);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+
+  // CP Form states
+  const [formCpTournament, setFormCpTournament] = useState('');
+  const [formCpTier, setFormCpTier] = useState('Copa de Liga');
+  const [formCpPlacement, setFormCpPlacement] = useState('1º Lugar (Campeão)');
+  const [formCpPoints, setFormCpPoints] = useState<number>(50);
+  const [formCpDate, setFormCpDate] = useState(new Date().toISOString().split('T')[0]);
+  const [formCpLocation, setFormCpLocation] = useState('');
+  const [formCpNotes, setFormCpNotes] = useState('');
 
   // Maintenance purge state
   const [purging, setPurging] = useState(false);
   const [purgeSuccess, setPurgeSuccess] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // Load user's CP records from Firestore
+  const loadMyCpRecords = async () => {
+    try {
+      setLoadingCp(true);
+      const snap = await getDocs(championshipPointsCol);
+      const userRecords: ChampionshipPointRecord[] = [];
+      snap.forEach(d => {
+        const item = { id: d.id, ...d.data() } as ChampionshipPointRecord;
+        if (item.memberId === currentMember.id) {
+          userRecords.push(item);
+        }
+      });
+      userRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setCpRecords(userRecords);
+    } catch (e) {
+      console.warn('Could not load CP records:', e);
+    } finally {
+      setLoadingCp(false);
+    }
+  };
+
+  useEffect(() => {
+    setName(currentMember.name || '');
+    setNickname(currentMember.nickname || '');
+    setAvatarSprite(currentMember.avatarSprite || 'pikachu');
+    setRole(currentMember.role as any || 'pokeball');
+    setOfficialPoints(currentMember.officialPoints || 0);
+    setCpTarget(currentMember.cpTarget || 100);
+
+    loadMyCpRecords();
+  }, [currentMember.id]);
+
+  // Update points when placement or tier changes in add CP modal
+  const handleTierChange = (tier: string) => {
+    setFormCpTier(tier);
+    const presets = CP_TIER_PRESETS[tier];
+    if (presets) {
+      const firstPlace = Object.keys(presets)[0];
+      setFormCpPlacement(firstPlace);
+      setFormCpPoints(presets[firstPlace] || 0);
+    }
+  };
+
+  const handlePlacementChange = (placement: string) => {
+    setFormCpPlacement(placement);
+    const presets = CP_TIER_PRESETS[formCpTier];
+    if (presets && presets[placement] !== undefined) {
+      setFormCpPoints(presets[placement]);
+    }
+  };
+
+  const handleSaveCpRecord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formCpTournament.trim()) {
+      alert('Por favor, informe o nome do campeonato.');
+      return;
+    }
+
+    try {
+      setSavingCp(true);
+      await addChampionshipPoints({
+        memberId: currentMember.id,
+        memberName: currentMember.name,
+        avatarSprite: currentMember.avatarSprite,
+        tournamentName: formCpTournament.trim(),
+        tournamentTier: formCpTier,
+        placement: formCpPlacement,
+        points: Number(formCpPoints),
+        date: formCpDate,
+        location: formCpLocation.trim(),
+        notes: formCpNotes.trim()
+      });
+
+      // Update local state
+      const updatedPts = (officialPoints || 0) + Number(formCpPoints);
+      setOfficialPoints(updatedPts);
+      setCurrentMember({
+        ...currentMember,
+        officialPoints: updatedPts
+      });
+
+      setShowAddCpModal(false);
+      setFormCpTournament('');
+      setFormCpNotes('');
+      await loadMyCpRecords();
+      onMemberUpdated();
+    } catch (err) {
+      console.error('Error saving CP record:', err);
+      alert('Erro ao salvar os pontos de campeonato.');
+    } finally {
+      setSavingCp(false);
+    }
+  };
+
+  const handleDeleteCpRecord = async (record: ChampionshipPointRecord) => {
+    if (!confirm(`Deseja remover este registro de ${record.points} CP (${record.tournamentName})?`)) return;
+
+    try {
+      await deleteChampionshipPointRecord(record.id, currentMember.id, record.points);
+      const updatedPts = Math.max(0, (officialPoints || 0) - record.points);
+      setOfficialPoints(updatedPts);
+      setCurrentMember({
+        ...currentMember,
+        officialPoints: updatedPts
+      });
+      await loadMyCpRecords();
+      onMemberUpdated();
+    } catch (err) {
+      console.error('Error deleting CP record:', err);
+      alert('Erro ao excluir registro de CP.');
+    }
+  };
 
   const handleExecutePurge = async () => {
     try {
@@ -63,14 +235,6 @@ export default function MyProfile({ currentMember, setCurrentMember, onMemberUpd
       setPurging(false);
     }
   };
-
-  // Update form values if currentMember changes (e.g. from switcher)
-  useEffect(() => {
-    setName(currentMember.name || '');
-    setNickname(currentMember.nickname || '');
-    setAvatarSprite(currentMember.avatarSprite || 'pikachu');
-    setRole(currentMember.role as any || 'pokeball');
-  }, [currentMember]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +251,9 @@ export default function MyProfile({ currentMember, setCurrentMember, onMemberUpd
         name: name.trim(),
         nickname: nickname.trim().replace(/\s+/g, ''),
         avatarSprite: avatarSprite.trim().toLowerCase() || 'pikachu',
-        role: role
+        role: role,
+        officialPoints: Number(officialPoints) || 0,
+        cpTarget: Number(cpTarget) || 100
       };
 
       await updateDoc(memberRef, updatedFields);
@@ -107,39 +273,201 @@ export default function MyProfile({ currentMember, setCurrentMember, onMemberUpd
     }
   };
 
-  // Access control mapping for presentation
-  const getRoleRankValue = (r: string): number => {
-    const norm = r.toLowerCase().replace(/\s+/g, '');
-    if (norm === 'pokeball') return 1;
-    if (norm === 'greatball') return 2;
-    if (norm === 'ultraball') return 3;
-    if (norm === 'masterball') return 4;
-    if (norm === 'premiumball') return 5;
-    return 1;
-  };
-
-  const currentRankVal = getRoleRankValue(role);
-
-  const levelsList = [
-    { id: 'pokeball', label: 'Level Pokéball', points: '0 - 29 pts', desc: 'Iniciante competitivo. Classificação inicial de pontuação ao entrar no Spirits.', color: 'border-red-500/20 text-red-450 bg-red-950/10' },
-    { id: 'greatball', label: 'Level Greatball', points: '30 - 59 pts', desc: 'Membro regular. Participação ativa em torneios internos e treinos.', color: 'border-blue-500/20 text-blue-400 bg-blue-950/10' },
-    { id: 'ultraball', label: 'Level Ultraball', points: '60 - 99 pts', desc: 'Competitivo core. Alto engajamento, conquistas de vitórias consistentes.', color: 'border-yellow-500/30 text-yellow-400 bg-slate-900' },
-    { id: 'masterball', label: 'Level Masterball', points: '100 - 149 pts', desc: 'Elite Pro. Jogador de alto nível técnico com alto saldo de vitórias.', color: 'border-purple-500/30 text-purple-400 bg-purple-950/10' },
-    { id: 'premiumball', label: 'Level Premium ball', points: '150+ pts', desc: 'Staff / Lenda. Administradores e líderes do portal competitivo.', color: 'border-amber-500/50 text-amber-300 bg-slate-900' },
-  ];
+  const currentCp = officialPoints || 0;
+  const targetCp = Math.max(1, cpTarget || 100);
+  const cpProgressPercent = Math.min(100, Math.round((currentCp / targetCp) * 100));
 
   return (
     <div className="space-y-8" id="profile-management-view">
       {/* Page Header */}
-      <div className="border-b border-slate-850 pb-6">
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <span>⚙️</span> Configurações do Meu Perfil
-        </h1>
-        <p className="text-sm text-slate-400 mt-1">
-          Gerencie suas informações de jogador, selecione seu Pokémon de estimação como avatar animado e acompanhe sua evolução de pontuação interna.
-        </p>
+      <div className="border-b border-slate-850 pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <span>⚙️</span> Meu Perfil & Pontuação Oficial
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Gerencie seus dados pessoais, avatar Pokémon animado e acompanhe sua <strong>meta de pontuação em Championship Points (CP)</strong>.
+          </p>
+        </div>
+
+        {/* Quick CP Badge */}
+        <div className="bg-gradient-to-r from-amber-500/20 via-purple-600/20 to-slate-900 border border-amber-500/40 px-4 py-2.5 rounded-2xl flex items-center gap-3 shrink-0 shadow-lg">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <Trophy className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider">Pontuação CP Acumulada</div>
+            <div className="text-xl font-black text-white font-mono flex items-baseline gap-1">
+              <span>{currentCp}</span>
+              <span className="text-xs text-amber-400 font-bold">CP</span>
+              <span className="text-slate-500 text-xs font-normal">/ {targetCp} meta</span>
+            </div>
+          </div>
+        </div>
       </div>
 
+      {/* SECTION 1: CP & SCORE GOAL MODULE (EXPLICIT USER REQUEST) */}
+      <div className="bg-gradient-to-b from-slate-900/90 to-slate-950/90 border border-amber-500/30 rounded-3xl p-6 sm:p-7 shadow-xl space-y-6" id="my-profile-cp-module">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-md">
+              <Target className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-white">Minha Meta de Pontuação (Championship Points - CP)</h2>
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  Pontos Play! Pokémon
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Não é uma meta de qualidade subjetiva — é a sua meta numérica de pontos oficiais acumulados em torneios e copas.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            id="btn-open-add-cp-modal"
+            onClick={() => setShowAddCpModal(true)}
+            className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-450 hover:to-amber-550 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20 cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>Lançar Pontos de Torneio (CP)</span>
+          </button>
+        </div>
+
+        {/* Progress Bar & Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Card 1: Saldo de Pontos */}
+          <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4.5 space-y-1">
+            <div className="text-xs text-slate-400 flex items-center justify-between">
+              <span>Pontos Atuais</span>
+              <Trophy className="w-4 h-4 text-amber-400" />
+            </div>
+            <div className="text-2xl font-black text-amber-400 font-mono flex items-baseline gap-1">
+              <span>{currentCp}</span>
+              <span className="text-xs text-amber-300/80 font-bold">CP Oficiais</span>
+            </div>
+            <p className="text-[11px] text-slate-500">Acumulados em Copas, Desafios e Regionais</p>
+          </div>
+
+          {/* Card 2: Meta de Pontuação */}
+          <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4.5 space-y-1">
+            <div className="text-xs text-slate-400 flex items-center justify-between">
+              <span>Meta Pessoal de Pontos</span>
+              <Target className="w-4 h-4 text-purple-400" />
+            </div>
+            <div className="text-2xl font-black text-white font-mono flex items-baseline gap-1">
+              <span>{targetCp}</span>
+              <span className="text-xs text-purple-300 font-bold">CP Objetivo</span>
+            </div>
+            <p className="text-[11px] text-slate-500">Defina o seu objetivo para a temporada</p>
+          </div>
+
+          {/* Card 3: Progresso e Vaga */}
+          <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4.5 space-y-1">
+            <div className="text-xs text-slate-400 flex items-center justify-between">
+              <span>Progresso da Meta</span>
+              <Medal className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div className="text-2xl font-black text-emerald-400 font-mono">
+              {cpProgressPercent}%
+            </div>
+            <p className="text-[11px] text-slate-500">
+              {currentCp >= targetCp ? '🎉 Meta alcançada com sucesso!' : `Faltam ${Math.max(0, targetCp - currentCp)} CP para bater a meta`}
+            </p>
+          </div>
+        </div>
+
+        {/* Visual Progress Bar */}
+        <div className="space-y-2 bg-slate-950/50 p-4 rounded-2xl border border-slate-800/80">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
+              Barra de Evolução da Pontuação CP
+            </span>
+            <span className="text-amber-400 font-mono font-bold">{currentCp} / {targetCp} CP ({cpProgressPercent}%)</span>
+          </div>
+          <div className="w-full h-3 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+            <div 
+              className="h-full bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-400 transition-all duration-500 rounded-full"
+              style={{ width: `${cpProgressPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* History of CP Records for this user */}
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Medal className="w-4 h-4 text-amber-400" />
+              Histórico dos Meus Pontos Conquistados ({cpRecords.length})
+            </h3>
+            <span className="text-[11px] text-slate-500 font-mono">Sincronizado no perfil</span>
+          </div>
+
+          {loadingCp ? (
+            <div className="p-6 text-center text-xs text-slate-500">Carregando histórico de pontos...</div>
+          ) : cpRecords.length === 0 ? (
+            <div className="bg-slate-950/40 border border-dashed border-slate-800 rounded-2xl p-6 text-center space-y-2">
+              <p className="text-xs text-slate-400">Você ainda não possui pontos CP lançados individualmente.</p>
+              <button
+                type="button"
+                onClick={() => setShowAddCpModal(true)}
+                className="text-xs text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
+              >
+                Clique aqui para registrar sua primeira colocação em torneio
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
+              {cpRecords.map((rec) => (
+                <div 
+                  key={rec.id}
+                  className="bg-slate-950/70 border border-slate-800/80 hover:border-slate-700 p-3.5 rounded-xl flex items-center justify-between gap-3 transition-colors"
+                >
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-purple-950/60 text-purple-300 border border-purple-500/30">
+                        {rec.tournamentTier}
+                      </span>
+                      <span className="text-xs font-bold text-white truncate">{rec.tournamentName}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                      <span>🏆 {rec.placement}</span>
+                      <span>•</span>
+                      <span>📅 {rec.date}</span>
+                      {rec.location && (
+                        <>
+                          <span>•</span>
+                          <span className="truncate max-w-[100px]">📍 {rec.location}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="px-2.5 py-1 bg-amber-500/15 border border-amber-500/40 rounded-lg text-amber-400 font-black text-xs font-mono">
+                      +{rec.points} CP
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCpRecord(rec)}
+                      className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
+                      title="Excluir este lançamento"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* SECTION 2: PROFILE INFORMATION & AVATAR EDIT */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Left Column: Form & Avatar Update */}
@@ -198,6 +526,43 @@ export default function MyProfile({ currentMember, setCurrentMember, onMemberUpd
               </div>
             </div>
 
+            {/* Score & Points Configuration in Profile Form */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-850 pt-5">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                  Pontos Oficiais Atuais (CP)
+                </label>
+                <input 
+                  type="number" 
+                  min="0"
+                  id="profile-edit-official-points"
+                  value={officialPoints}
+                  onChange={(e) => setOfficialPoints(Number(e.target.value) || 0)}
+                  placeholder="0"
+                  className="w-full bg-slate-950/60 border border-slate-850 focus:border-purple-500/50 rounded-xl py-2.5 px-3 text-xs font-mono font-bold text-amber-400 focus:outline-none transition-colors"
+                />
+                <p className="text-[10px] text-slate-500 font-mono">Ajuste manual do total de Championship Points do Play! Pokémon.</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Target className="w-3.5 h-3.5 text-purple-400" />
+                  Meta Pessoal de Pontuação (CP)
+                </label>
+                <input 
+                  type="number" 
+                  min="1"
+                  id="profile-edit-cp-target"
+                  value={cpTarget}
+                  onChange={(e) => setCpTarget(Number(e.target.value) || 100)}
+                  placeholder="100"
+                  className="w-full bg-slate-950/60 border border-slate-850 focus:border-purple-500/50 rounded-xl py-2.5 px-3 text-xs font-mono font-bold text-purple-300 focus:outline-none transition-colors"
+                />
+                <p className="text-[10px] text-slate-500 font-mono">Defina quantos pontos CP deseja alcançar nesta temporada.</p>
+              </div>
+            </div>
+
             <div className="space-y-4 border-t border-slate-850 pt-5">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <div>
@@ -247,22 +612,21 @@ export default function MyProfile({ currentMember, setCurrentMember, onMemberUpd
                 })}
               </div>
 
-              {/* Simulation Rank Selector */}
+              {/* Rank Selector */}
               <div className="space-y-1.5 pt-2">
-                <label className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">Meu Level / Evolução Competitiva</label>
+                <label className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">Meu Cargo / Nível na Spirits</label>
                 <select 
                   id="profile-edit-role"
                   value={role}
                   onChange={(e: any) => setRole(e.target.value)}
                   className="w-full bg-slate-950/60 border border-slate-850 focus:border-purple-500/50 rounded-xl py-2.5 px-3 text-xs font-medium text-white focus:outline-none transition-colors cursor-pointer"
                 >
-                  <option value="pokeball">🔴 Level Pokéball (0 - 29 pts)</option>
-                  <option value="greatball">🔵 Level Greatball (30 - 59 pts)</option>
-                  <option value="ultraball">⚫ Level Ultraball (60 - 99 pts)</option>
-                  <option value="masterball">🟣 Level Masterball (100 - 149 pts)</option>
-                  <option value="Premium ball">✨ Level Premium (150+ pts ou Staff)</option>
+                  <option value="pokeball">🔴 Level Pokéball (Iniciante)</option>
+                  <option value="greatball">🔵 Level Greatball (Regular)</option>
+                  <option value="ultraball">⚫ Level Ultraball (Avançado)</option>
+                  <option value="masterball">🟣 Level Masterball (Elite)</option>
+                  <option value="Premium ball">✨ Level Premium (Staff / Lenda)</option>
                 </select>
-                <p className="text-[10px] text-slate-550 font-mono mt-1">Sinaliza seu progresso acumulado em partidas oficiais e eventos internos do time.</p>
               </div>
             </div>
 
@@ -275,7 +639,7 @@ export default function MyProfile({ currentMember, setCurrentMember, onMemberUpd
                 <div className="mb-1">{getRoleBadge(role)}</div>
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider">Visualização do Avatar Ativo</h4>
                 <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
-                  Sprite animado para <strong className="text-purple-400">@{nickname || 'treinador'}</strong>. Caso digite um nome inválido, o sistema utilizará um Pokémon Substituto como padrão temporário.
+                  Sprite animado para <strong className="text-purple-400">@{nickname || 'treinador'}</strong> com <strong className="text-amber-400">{officialPoints} CP</strong>.
                 </p>
               </div>
             </div>
@@ -298,47 +662,42 @@ export default function MyProfile({ currentMember, setCurrentMember, onMemberUpd
           </form>
         </div>
 
-        {/* Right Column: Roles Access & Perks Card */}
+        {/* Right Column: Roles & Maintenance Card */}
         <div className="space-y-6">
-          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6" id="access-level-guide">
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6" id="scoring-rules-guide">
             <h3 className="text-base font-bold text-white flex items-center gap-2 border-b border-slate-850 pb-3 mb-4">
-              <Award className="w-4.5 h-4.5 text-purple-400" />
-              Evolução & Classificação Interna
+              <Award className="w-4.5 h-4.5 text-amber-400" />
+              Tabela Oficial Play! Pokémon (CP)
             </h3>
 
-            <p className="text-xs text-slate-400 leading-relaxed mb-6">
-              Os níveis de Pokébola indicam a pontuação competitiva e o engajamento acumulado de cada mestre no Spirits TCG. Eles **não limitam o uso de recursos do portal**, servindo puramente para classificação de progresso:
+            <p className="text-xs text-slate-300 leading-relaxed mb-4">
+              Os pontos abaixo são creditados para classificação oficial e convite ao Mundial (Worlds):
             </p>
 
-            <div className="space-y-4">
-              {levelsList.map((lvl) => {
-                const isActive = role === lvl.id;
-                return (
-                  <div 
-                    key={lvl.id}
-                    className={`p-3.5 rounded-xl border flex flex-col gap-1 transition-all ${
-                      isActive 
-                        ? 'bg-purple-950/20 border-purple-500/40 text-slate-100 ring-1 ring-purple-500/20' 
-                        : 'bg-slate-950/20 border-slate-850/60 text-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-bold leading-none">{lvl.label}</span>
-                      <span className="text-[10px] font-mono font-bold text-purple-400 bg-purple-950/40 px-2 py-0.5 rounded-full">{lvl.points}</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
-                      {lvl.desc}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
+            <div className="space-y-3">
+              <div className="p-3 rounded-xl border border-slate-800 bg-slate-950/60 text-xs space-y-1">
+                <div className="font-bold text-amber-400 flex items-center justify-between">
+                  <span>🏆 Copa de Liga (Cup)</span>
+                  <span className="font-mono">Até 50 CP</span>
+                </div>
+                <div className="text-[10px] text-slate-400">1º: 50 CP • 2º: 40 CP • Top 4: 32 CP • Top 8: 25 CP</div>
+              </div>
 
-            <div className="mt-5 bg-slate-950/50 p-3.5 rounded-xl border border-slate-850 text-[10px] text-slate-455 leading-relaxed flex gap-2.5">
-              <TrendingUp className="w-5 h-5 text-purple-400 shrink-0" />
-              <span>
-                <strong>Como pontuar:</strong> Cada vitória em partidas do time ou torneios oficiais soma **3 pontos**, empates somam **1 ponto**, e derrotas somam **0 pontos**.
-              </span>
+              <div className="p-3 rounded-xl border border-slate-800 bg-slate-950/60 text-xs space-y-1">
+                <div className="font-bold text-purple-400 flex items-center justify-between">
+                  <span>🥊 Desafio de Liga (Challenge)</span>
+                  <span className="font-mono">Até 15 CP</span>
+                </div>
+                <div className="text-[10px] text-slate-400">1º: 15 CP • 2º: 12 CP • Top 4: 10 CP • Top 8: 8 CP</div>
+              </div>
+
+              <div className="p-3 rounded-xl border border-slate-800 bg-slate-950/60 text-xs space-y-1">
+                <div className="font-bold text-emerald-400 flex items-center justify-between">
+                  <span>🌎 Campeonato Regional</span>
+                  <span className="font-mono">Até 200 CP</span>
+                </div>
+                <div className="text-[10px] text-slate-400">1º: 200 CP • 2º: 160 CP • Top 4: 130 CP • Top 8: 100 CP</div>
+              </div>
             </div>
           </div>
 
@@ -346,12 +705,11 @@ export default function MyProfile({ currentMember, setCurrentMember, onMemberUpd
           <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md">
             <h3 className="text-base font-bold text-white flex items-center gap-2 border-b border-slate-850 pb-3 mb-4">
               <Trash2 className="w-4.5 h-4.5 text-rose-400" />
-              Modo Produção Real / Limpeza de Testes
+              Limpeza Geral de Testes
             </h3>
 
             <p className="text-xs text-slate-400 leading-relaxed mb-4">
-              Ao iniciar o uso real da equipe, todos os confrontos, campeonatos e empréstimos de teste devem ser limpos. 
-              <strong> Seus Baralhos, Membros do Time, Perfil e Coleção ficam 100% intactos e preservados.</strong>
+              Zera dados de testes mantendo todos os <strong>Baralhos (Decks)</strong> cadastrados intactos.
             </p>
 
             {purgeSuccess && (
@@ -368,53 +726,197 @@ export default function MyProfile({ currentMember, setCurrentMember, onMemberUpd
               className="w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 cursor-pointer disabled:opacity-50"
             >
               <Trash2 className="w-4 h-4 text-rose-400" />
-              <span>{purging ? 'Limpando dados de teste...' : '🧹 Limpar Dados de Teste (Zerar Partidas e Torneios)'}</span>
+              <span>{purging ? 'Limpando dados de teste...' : '🧹 Limpar Dados de Teste (Manter Decks)'}</span>
             </button>
           </div>
         </div>
 
-        {/* Modal de Confirmação da Limpeza */}
-        {showConfirmModal && (
-          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-            <div className="bg-slate-900 border border-rose-500/40 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
-              <div className="flex items-center gap-3 text-rose-400">
-                <AlertOctagon className="w-6 h-6 shrink-0" />
-                <h4 className="text-base font-bold text-white">Confirmar Limpeza de Testes</h4>
+      </div>
+
+      {/* MODAL 1: LANÇAR PONTOS CP (USANDO MODALPORTAL PARA RESPONSIVIDADE PERFEITA EM QUALQUER APARELHO) */}
+      <ModalPortal isOpen={showAddCpModal} onClose={() => setShowAddCpModal(false)}>
+        <div className="bg-slate-900 border border-amber-500/40 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[90dvh] overflow-hidden my-auto animate-fade-in">
+          {/* Header */}
+          <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-amber-500/20 border border-amber-500/30 rounded-xl text-amber-400">
+                <Trophy className="w-5 h-5" />
               </div>
-
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Esta ação apagará permanentemente todos os registros de <strong>partidas</strong>, <strong>campeonatos</strong> e <strong>empréstimos de teste</strong>, zerando as estatísticas para começar do zero.
-              </p>
-
-              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
-                <div className="text-emerald-400 font-bold">✅ O que será MANTIDO:</div>
-                <div>• Todos os Baralhos cadastrados</div>
-                <div>• Todos os Membros do Time & Seu Perfil</div>
-                <div>• Toda a Coleção de Cartas</div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-750 transition-all cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleExecutePurge}
-                  disabled={purging}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 transition-all shadow-lg shadow-rose-900/30 cursor-pointer disabled:opacity-50"
-                >
-                  {purging ? 'Limpando...' : 'Confirmar e Limpar'}
-                </button>
+              <div>
+                <h3 className="text-base font-bold text-white">Lançar Pontos Oficiais de Torneio (CP)</h3>
+                <p className="text-xs text-slate-400">Registrar no seu perfil de {currentMember.name}</p>
               </div>
             </div>
+            <button 
+              onClick={() => setShowAddCpModal(false)}
+              className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-        )}
 
-      </div>
+          {/* Form Body with auto-scroll */}
+          <form onSubmit={handleSaveCpRecord} className="flex flex-col flex-1 overflow-hidden min-h-0">
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1 overscroll-contain">
+              
+              {/* Tournament Tier */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-300">Tipo de Torneio Oficial:</label>
+                <select
+                  value={formCpTier}
+                  onChange={(e) => handleTierChange(e.target.value)}
+                  className="w-full p-2.5 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl text-white text-xs outline-none font-semibold cursor-pointer"
+                >
+                  <option value="Copa de Liga">🏆 Copa de Liga (Até 50 CP)</option>
+                  <option value="Desafio de Liga">🥊 Desafio de Liga (Até 15 CP)</option>
+                  <option value="Regional">🌎 Campeonato Regional (Até 200 CP)</option>
+                  <option value="Special Event">✨ Special Event (Até 200 CP)</option>
+                  <option value="Internacional">🌐 Campeonato Internacional (Até 500 CP)</option>
+                </select>
+              </div>
+
+              {/* Placement */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-300">Sua Colocação no Torneio:</label>
+                <select
+                  value={formCpPlacement}
+                  onChange={(e) => handlePlacementChange(e.target.value)}
+                  className="w-full p-2.5 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl text-white text-xs outline-none font-semibold cursor-pointer"
+                >
+                  {CP_TIER_PRESETS[formCpTier] && Object.keys(CP_TIER_PRESETS[formCpTier]).map((place) => (
+                    <option key={place} value={place}>
+                      {place} — (+{CP_TIER_PRESETS[formCpTier][place]} CP)
+                    </option>
+                  ))}
+                  <option value="Outra Colocação">Outra Colocação Personalizada</option>
+                </select>
+              </div>
+
+              {/* Points Value */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-amber-400">Pontos CP Conquistados:</label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={formCpPoints}
+                  onChange={(e) => setFormCpPoints(Number(e.target.value) || 0)}
+                  className="w-full p-2.5 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl text-amber-400 font-mono font-bold text-sm outline-none"
+                />
+              </div>
+
+              {/* Tournament Name */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-300">Nome do Torneio:</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="ex: Copa de Liga Caverna do Dragão"
+                  value={formCpTournament}
+                  onChange={(e) => setFormCpTournament(e.target.value)}
+                  className="w-full p-2.5 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl text-white text-xs outline-none"
+                />
+              </div>
+
+              {/* Date & Location */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-300">Data:</label>
+                  <input
+                    type="date"
+                    required
+                    value={formCpDate}
+                    onChange={(e) => setFormCpDate(e.target.value)}
+                    className="w-full p-2.5 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl text-white text-xs outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-300">Loja / Cidade:</label>
+                  <input
+                    type="text"
+                    placeholder="ex: Bauru - SP"
+                    value={formCpLocation}
+                    onChange={(e) => setFormCpLocation(e.target.value)}
+                    className="w-full p-2.5 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl text-white text-xs outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-300">Anotações / Deck Usado (Opcional):</label>
+                <input
+                  type="text"
+                  placeholder="ex: Joguei de Dragapult ex, 4 vitórias e 1 empate no suíço"
+                  value={formCpNotes}
+                  onChange={(e) => setFormCpNotes(e.target.value)}
+                  className="w-full p-2.5 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl text-white text-xs outline-none"
+                />
+              </div>
+
+            </div>
+
+            {/* Pinned Sticky Footer */}
+            <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-t border-slate-800 bg-slate-950/90 flex items-center justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowAddCpModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-750 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={savingCp}
+                className="px-5 py-2 rounded-xl text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-350 transition-all shadow-lg shadow-amber-400/20 cursor-pointer disabled:opacity-50"
+              >
+                {savingCp ? 'Salvando...' : 'Salvar e Creditar Pontos'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </ModalPortal>
+
+      {/* MODAL 2: CONFIRMAÇÃO DA LIMPEZA DE TESTES */}
+      <ModalPortal isOpen={showConfirmModal} onClose={() => setShowConfirmModal(false)}>
+        <div className="bg-slate-900 border border-rose-500/40 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4 my-auto animate-fade-in">
+          <div className="flex items-center gap-3 text-rose-400">
+            <AlertOctagon className="w-6 h-6 shrink-0" />
+            <h4 className="text-base font-bold text-white">Confirmar Limpeza de Testes</h4>
+          </div>
+
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Esta ação apagará permanentemente todos os registros de <strong>partidas</strong>, <strong>campeonatos</strong> e <strong>empréstimos de teste</strong>, zerando as estatísticas para começar do zero.
+          </p>
+
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
+            <div className="text-emerald-400 font-bold">✅ O que será MANTIDO:</div>
+            <div>• Todos os Baralhos cadastrados (100% preservados)</div>
+            <div>• Todos os Membros do Time & Seu Perfil</div>
+            <div>• Toda a Coleção de Cartas</div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowConfirmModal(false)}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-750 transition-all cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleExecutePurge}
+              disabled={purging}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 transition-all shadow-lg shadow-rose-900/30 cursor-pointer disabled:opacity-50"
+            >
+              {purging ? 'Limpando...' : 'Confirmar e Limpar'}
+            </button>
+          </div>
+        </div>
+      </ModalPortal>
+
     </div>
   );
 }

@@ -42,6 +42,7 @@ import {
   onSnapshot 
 } from 'firebase/firestore';
 import PokemonSprite from './PokemonSprite';
+import ModalPortal from './ModalPortal';
 
 interface TournamentsProps {
   currentMember: Member;
@@ -1088,9 +1089,8 @@ export default function Tournaments({ currentMember }: TournamentsProps) {
       )}
 
       {/* 5. MODAL DE CADASTRO / EDIÇÃO */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl max-h-[92vh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200">
+      <ModalPortal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} id="tournaments-modal-portal">
+        <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl max-h-[90dvh] flex flex-col shadow-2xl overflow-hidden my-auto animate-fade-in">
             
             {/* Modal Header */}
             <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
@@ -1460,8 +1460,7 @@ export default function Tournaments({ currentMember }: TournamentsProps) {
           </form>
 
           </div>
-        </div>
-      )}
+      </ModalPortal>
 
     </div>
   );

@@ -63,53 +63,61 @@ export default function TrainerLog({ currentMember, onSyncMatch }: TrainerLogPro
         console.warn('Could not load from Firestore, using local cache:', e);
       }
 
-      // Check localStorage if Firestore returned empty
+      // Check localStorage if Firestore returned empty, but filter out automatic sample
       if (loadedLogs.length === 0) {
         const cached = localStorage.getItem(`trainer_logs_${currentMember.id}`);
         if (cached) {
           try {
-            loadedLogs = JSON.parse(cached);
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed)) {
+              // Discard any lingering auto-sample so data stays truly zerado
+              loadedLogs = parsed.filter((l: any) => l && l.id !== 'sample-charizard-dragapult');
+            }
           } catch (e) {
             console.error('Error parsing cached logs:', e);
           }
         }
       }
 
-      // If still empty, provide the default sample log so user immediately experiences the replay
-      if (loadedLogs.length === 0) {
-        const defaultSample = parsePTCGLLog(SAMPLE_PT_LOG, currentMember.name || currentMember.nickname);
-        defaultSample.userId = currentMember.id;
-        defaultSample.id = 'sample-charizard-dragapult';
-        loadedLogs = [defaultSample];
-        localStorage.setItem(`trainer_logs_${currentMember.id}`, JSON.stringify(loadedLogs));
-      }
-
-      // Re-hydrate turns with the latest parser logic if rawLog is present
-      loadedLogs = loadedLogs.map(m => {
-        const needsRefresh = m.rawLog && (
-          m.id === 'sample-charizard-dragapult' || 
-          !m.turns || 
-          m.turns.length === 0 || 
-          m.turns[0].evolutions === undefined ||
-          (m.turns[0].turnNumber === 0 && (!m.turns[0].p1Active || !m.turns[0].p2Active))
-        );
-        if (needsRefresh && m.rawLog) {
-          const rawToParse = m.id === 'sample-charizard-dragapult' ? SAMPLE_PT_LOG : m.rawLog;
-          const refreshed = parsePTCGLLog(rawToParse, currentMember.name || currentMember.nickname);
-          return { ...m, ...refreshed, rawLog: rawToParse, id: m.id, userId: m.userId };
-        }
-        return m;
-      });
-
       // Sort by date descending
       loadedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       setLogs(loadedLogs);
-      if (loadedLogs.length > 0 && !selectedLogId) {
+      if (loadedLogs.length > 0) {
         setSelectedLogId(loadedLogs[0].id);
+      } else {
+        setSelectedLogId('');
       }
     } catch (err) {
       console.error('Failed to load logs:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClearAllLogs = async () => {
+    if (!confirm('Deseja realmente zerar todos os registros de batalha do TrainerLog?')) return;
+    try {
+      setLoading(true);
+      const snap = await getDocs(trainerLogsCol);
+      for (const d of snap.docs) {
+        await deleteDoc(doc(db, 'trainer_logs', d.id));
+      }
+      if (typeof window !== 'undefined' && window.localStorage) {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('trainer_logs_') || k.startsWith('trainer_log_'))) {
+            localStorage.removeItem(k);
+          }
+        }
+      }
+      setLogs([]);
+      setSelectedLogId('');
+      setStatusMessage({ type: 'success', text: 'Todos os registros do TrainerLog foram zerados com sucesso!' });
+      setTimeout(() => setStatusMessage(null), 4000);
+    } catch (err) {
+      console.error('Error clearing logs:', err);
+      setStatusMessage({ type: 'error', text: 'Erro ao zerar logs do TrainerLog.' });
     } finally {
       setLoading(false);
     }
@@ -226,18 +234,18 @@ export default function TrainerLog({ currentMember, onSyncMatch }: TrainerLogPro
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={() => {
-                const sample = parsePTCGLLog(SAMPLE_PT_LOG, currentMember.name || currentMember.nickname);
-                handleImportLog(sample, false);
-              }}
-              className="px-4 py-2.5 bg-slate-850 hover:bg-slate-800 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2"
+              id="btn-clear-trainer-logs"
+              onClick={handleClearAllLogs}
+              className="px-3.5 py-2.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 hover:border-rose-500/50 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+              title="Zerar todos os replays e registros do TrainerLog"
             >
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              Exemplo Rápido
+              <Trash2 className="w-4 h-4 text-rose-400" />
+              <span>Zerar TrainerLog</span>
             </button>
+
             <button
               onClick={() => setIsImporterOpen(true)}
-              className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-extrabold shadow-lg shadow-purple-600/30 transition-all flex items-center gap-2"
+              className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-extrabold shadow-lg shadow-purple-600/30 transition-all flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               Importar Log do PTCGL
@@ -344,25 +352,16 @@ export default function TrainerLog({ currentMember, onSyncMatch }: TrainerLogPro
 
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2 bg-slate-950/40 p-3 rounded-2xl border border-slate-850">
               <div className="text-xs text-slate-400 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Quer experimentar agora sem abrir o jogo? Carregue uma partida gravada:</span>
+                <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+                <span>Pronto para analisar suas jogadas? Importe o histórico copiado do PTCGL:</span>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => {
-                    const sample = parsePTCGLLog(SAMPLE_PT_LOG, currentMember.name || currentMember.nickname);
-                    handleImportLog(sample, false);
-                  }}
-                  className="px-3.5 py-1.5 bg-slate-850 hover:bg-slate-800 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Carregar Partida de Demonstração
-                </button>
-                <button
                   onClick={() => setIsImporterOpen(true)}
-                  className="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-purple-600/30 flex items-center gap-1.5"
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-purple-600/30 flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Abrir Importador
+                  <Plus className="w-3.5 h-3.5" /> Abrir Importador de Log
                 </button>
               </div>
             </div>
@@ -472,89 +471,113 @@ export default function TrainerLog({ currentMember, onSyncMatch }: TrainerLogPro
       )}
 
       {/* Main Content Areas based on selected sub-tab */}
-      {activeSubTab === 'replay' && (
-        selectedMatch ? (
-          <BoardReplay match={selectedMatch} />
-        ) : (
-          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-12 text-center text-slate-400">
-            Nenhuma partida selecionada.
+      {logs.length === 0 ? (
+        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-10 md:p-14 text-center space-y-4" id="trainerlog-empty-state">
+          <div className="w-16 h-16 rounded-2xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400 mx-auto text-2xl shadow-lg">
+            <FileText className="w-8 h-8" />
           </div>
-        )
-      )}
-
-      {activeSubTab === 'stats' && (
-        <TrainerLogStats logs={logs} />
-      )}
-
-      {activeSubTab === 'history' && (
-        <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-            <div>
-              <h3 className="text-base font-bold text-white">Histórico de Batalhas do TrainerLog</h3>
-              <p className="text-xs text-slate-400">Todos os registros importados do Pokémon TCG Live</p>
-            </div>
+          <div className="max-w-md mx-auto space-y-2">
+            <h3 className="text-lg font-bold text-white">Nenhum Registro de Batalha no TrainerLog</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Todos os registros foram zerados. Cole o registro de batalha do Pokémon TCG Live para gerar replays interativos turno a turno, análises de prêmios e estatísticas competitivas.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <button
               onClick={() => setIsImporterOpen(true)}
-              className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-purple-600/30 flex items-center gap-2 cursor-pointer"
             >
-              <Plus className="w-4 h-4" /> Importar Novo Log
+              <Plus className="w-4 h-4" /> Importar Log do PTCGL
             </button>
           </div>
-
-          <div className="divide-y divide-slate-850">
-            {logs.map((log) => {
-              const isWin = log.result === 'win';
-              return (
-                <div
-                  key={log.id}
-                  className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-850/40 p-3 rounded-2xl transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex -space-x-3 items-center shrink-0">
-                      <PokemonCard name={log.playerDeckArchetype} size="xs" />
-                      <PokemonCard name={log.opponentDeckArchetype} size="xs" />
-                    </div>
-
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
-                          isWin ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
-                        }`}>
-                          {isWin ? 'Vitória' : 'Derrota'}
-                        </span>
-                        <span className="text-sm font-bold text-white">
-                          {log.playerDeckArchetype} vs {log.opponentDeckArchetype}
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-400 mt-0.5">
-                        {log.player1Name} vs {log.player2Name} • {log.wentFirst ? 'Iniciativa: 1º a Jogar' : 'Iniciativa: 2º a Jogar'} • {log.totalTurns} turnos
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 self-end md:self-center">
-                    <button
-                      onClick={() => {
-                        setSelectedLogId(log.id);
-                        setActiveSubTab('replay');
-                      }}
-                      className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
-                    >
-                      <Play className="w-3.5 h-3.5" /> Ver Replay
-                    </button>
-                    <button
-                      onClick={(e) => handleDeleteLog(log.id, e)}
-                      className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-xl transition-colors"
-                      title="Excluir log"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
+      ) : (
+        <>
+          {activeSubTab === 'replay' && (
+            selectedMatch ? (
+              <BoardReplay match={selectedMatch} />
+            ) : (
+              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-12 text-center text-slate-400">
+                Nenhuma partida selecionada.
+              </div>
+            )
+          )}
+
+          {activeSubTab === 'stats' && (
+            <TrainerLogStats logs={logs} />
+          )}
+
+          {activeSubTab === 'history' && (
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div>
+                  <h3 className="text-base font-bold text-white">Histórico de Batalhas do TrainerLog</h3>
+                  <p className="text-xs text-slate-400">Todos os registros importados do Pokémon TCG Live</p>
+                </div>
+                <button
+                  onClick={() => setIsImporterOpen(true)}
+                  className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" /> Importar Novo Log
+                </button>
+              </div>
+
+              <div className="divide-y divide-slate-850">
+                {logs.map((log) => {
+                  const isWin = log.result === 'win';
+                  return (
+                    <div
+                      key={log.id}
+                      className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-850/40 p-3 rounded-2xl transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="flex -space-x-3 items-center shrink-0">
+                          <PokemonCard name={log.playerDeckArchetype} size="xs" />
+                          <PokemonCard name={log.opponentDeckArchetype} size="xs" />
+                        </div>
+
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                              isWin ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                            }`}>
+                              {isWin ? 'Vitória' : 'Derrota'}
+                            </span>
+                            <span className="text-sm font-bold text-white">
+                              {log.playerDeckArchetype} vs {log.opponentDeckArchetype}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-400 mt-0.5">
+                            {log.player1Name} vs {log.player2Name} • {log.wentFirst ? 'Iniciativa: 1º a Jogar' : 'Iniciativa: 2º a Jogar'} • {log.totalTurns} turnos
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 self-end md:self-center">
+                        <button
+                          onClick={() => {
+                            setSelectedLogId(log.id);
+                            setActiveSubTab('replay');
+                          }}
+                          className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                        >
+                          <Play className="w-3.5 h-3.5" /> Ver Replay
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteLog(log.id, e)}
+                          className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-xl transition-colors"
+                          title="Excluir log"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Log Importer Modal */}

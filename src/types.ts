@@ -8,6 +8,7 @@ export interface Member {
   losses: number;
   draws: number;
   officialPoints?: number; // Championship Points (CP) acumulados na temporada oficial
+  cpTarget?: number; // Meta pessoal de pontuação oficial (CP)
   favoriteCard?: string;
   favoriteCardImage?: string;
   joinDate: string;

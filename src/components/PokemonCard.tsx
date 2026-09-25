@@ -8,6 +8,7 @@ import {
   getPokemonSpriteHierarchy
 } from '../utils/cardImages';
 import { Eye, Zap, Flame, ShieldAlert, Sparkles, ExternalLink, CheckCircle2 } from 'lucide-react';
+import ModalPortal from './ModalPortal';
 
 export interface PokemonCardProps {
   name: string;
@@ -223,78 +224,70 @@ export default function PokemonCard({
         </div>
       )}
 
-      {isInspecting && (
+      <ModalPortal isOpen={isInspecting} onClose={() => setIsInspecting(false)}>
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsInspecting(false);
-          }}
+          className="bg-slate-900 border border-purple-500/40 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-center relative my-auto animate-fade-in"
+          onClick={(e) => e.stopPropagation()}
         >
-          <div 
-            className="bg-slate-900 border border-purple-500/40 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-center relative"
-            onClick={(e) => e.stopPropagation()}
+          <button
+            onClick={() => setIsInspecting(false)}
+            className="absolute top-4 right-4 p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
           >
-            <button
-              onClick={() => setIsInspecting(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-            >
-              ✕
-            </button>
+            ✕
+          </button>
 
-            <div className="card-data-field flex items-center justify-center gap-2">
-              <span className="text-sm font-bold text-purple-400 uppercase tracking-wider">
-                {isBack ? 'Carta de Prêmio' : cardData.category}
+          <div className="card-data-field flex items-center justify-center gap-2">
+            <span className="text-sm font-bold text-purple-400 uppercase tracking-wider">
+              {isBack ? 'Carta de Prêmio' : cardData.category}
+            </span>
+            {!isBack && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-950 border border-purple-500/40 text-[10px] font-mono font-bold text-amber-300">
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                {ptcglCard.canonicalCode}
               </span>
-              {!isBack && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-950 border border-purple-500/40 text-[10px] font-mono font-bold text-amber-300">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                  {ptcglCard.canonicalCode}
-                </span>
-              )}
-              {!isBack && cardData.isFromCollection && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-950/80 border border-emerald-500/50 text-[10px] font-semibold text-emerald-300">
-                  <Sparkles className="w-3 h-3 text-emerald-400" />
-                  Vinculado ao Acervo
-                </span>
-              )}
-            </div>
-
-            <div className="w-56 h-78 sm:w-64 sm:h-90 mx-auto rounded-2xl overflow-hidden shadow-2xl border border-slate-700 bg-slate-950 flex items-center justify-center relative">
-              <img
-                key={`inspect-${cardData.id}-${imgLevel}`}
-                src={cardSrc}
-                alt={cardData.name}
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-contain"
-              />
-            </div>
-
-            {hasEvolvedInTurn && (
-              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-400/40 text-xs text-amber-200 flex items-center justify-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                <span className="font-medium">
-                  <strong className="text-amber-300">Evolução do Turno:</strong> {evolvedFrom ? `${evolvedFrom} ➔ ` : ''}{cardData.name}
-                </span>
-              </div>
             )}
-
-            <div className="space-y-1">
-              <h3 className="text-lg font-black text-white">{isBack ? 'Prêmio em Jogo' : cardData.name}</h3>
-              <p className="card-data-field text-xs font-mono text-slate-400">
-                Código Oficial PTCGL: <span className="text-purple-300 font-bold">{ptcglCard.canonicalCode}</span>
-              </p>
-            </div>
-
-            <button
-              onClick={() => setIsInspecting(false)}
-              className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-purple-600/30"
-            >
-              Fechar Visualização
-            </button>
+            {!isBack && cardData.isFromCollection && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-950/80 border border-emerald-500/50 text-[10px] font-semibold text-emerald-300">
+                <Sparkles className="w-3 h-3 text-emerald-400" />
+                Vinculado ao Acervo
+              </span>
+            )}
           </div>
+
+          <div className="w-56 h-78 sm:w-64 sm:h-90 mx-auto rounded-2xl overflow-hidden shadow-2xl border border-slate-700 bg-slate-950 flex items-center justify-center relative">
+            <img
+              key={`inspect-${cardData.id}-${imgLevel}`}
+              src={cardSrc}
+              alt={cardData.name}
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-contain"
+            />
+          </div>
+
+          {hasEvolvedInTurn && (
+            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-400/40 text-xs text-amber-200 flex items-center justify-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="font-medium">
+                <strong className="text-amber-300">Evolução do Turno:</strong> {evolvedFrom ? `${evolvedFrom} ➔ ` : ''}{cardData.name}
+              </span>
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <h3 className="text-lg font-black text-white">{isBack ? 'Prêmio em Jogo' : cardData.name}</h3>
+            <p className="card-data-field text-xs font-mono text-slate-400">
+              Código Oficial PTCGL: <span className="text-purple-300 font-bold">{ptcglCard.canonicalCode}</span>
+            </p>
+          </div>
+
+          <button
+            onClick={() => setIsInspecting(false)}
+            className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-purple-600/30 cursor-pointer"
+          >
+            Fechar Visualização
+          </button>
         </div>
-      )}
+      </ModalPortal>
     </div>
   );
 }

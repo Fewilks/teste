@@ -201,6 +201,18 @@ export async function purgeAllDataExceptDecks(): Promise<{
       deletedLogs++;
     }
 
+    // Limpar cache local de replays
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const toRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('trainer_logs_') || k.startsWith('trainer_log_'))) {
+          toRemove.push(k);
+        }
+      }
+      toRemove.forEach(k => localStorage.removeItem(k));
+    }
+
     // 6. Championship Points (Zerar registros de CP)
     const cpSnap = await getDocs(championshipPointsCol);
     for (const d of cpSnap.docs) {
@@ -350,9 +362,9 @@ export async function ensureInitialChampionshipData(): Promise<void> {
       await setDoc(doc(db, 'members', sausanaviciusId), newMember);
     } else {
       const currentPts = sausanavicius.data().officialPoints;
-      if (currentPts === undefined || currentPts === 0) {
+      if (currentPts === undefined) {
         await updateDoc(doc(db, 'members', sausanavicius.id), {
-          officialPoints: 50
+          officialPoints: 0
         });
       }
     }

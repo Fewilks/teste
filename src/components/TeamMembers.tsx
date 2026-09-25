@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import PokemonSprite from './PokemonSprite';
 import PokemonLoader from './PokemonLoader';
+import ModalPortal from './ModalPortal';
 
 interface TeamMembersProps {
   currentMember: Member;
@@ -438,9 +439,8 @@ export default function TeamMembers({ currentMember, setCurrentMember, onMemberU
       )}
 
       {/* Add Teammate Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 z-50 animate-fade-in overflow-y-auto" id="add-member-modal">
-          <div className="bg-slate-900 border border-slate-700/80 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] sm:max-h-[88vh] flex flex-col my-auto">
+      <ModalPortal isOpen={showAddModal} onClose={() => setShowAddModal(false)} id="add-member-modal">
+        <div className="bg-slate-900 border border-slate-700/80 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden max-h-[90dvh] flex flex-col my-auto animate-fade-in">
             
             {/* Header */}
             <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
@@ -560,13 +560,11 @@ export default function TeamMembers({ currentMember, setCurrentMember, onMemberU
             </form>
 
           </div>
-        </div>
-      )}
+      </ModalPortal>
 
       {/* Edit Profile Modal */}
-      {showEditModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 z-50 animate-fade-in overflow-y-auto" id="edit-profile-modal">
-          <div className="bg-slate-900 border border-slate-700/80 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] sm:max-h-[88vh] flex flex-col my-auto">
+      <ModalPortal isOpen={showEditModal} onClose={() => setShowEditModal(false)} id="edit-profile-modal">
+        <div className="bg-slate-900 border border-slate-700/80 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden max-h-[90dvh] flex flex-col my-auto animate-fade-in">
             
             {/* Header */}
             <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
@@ -651,13 +649,15 @@ export default function TeamMembers({ currentMember, setCurrentMember, onMemberU
             </form>
 
           </div>
-        </div>
-      )}
+      </ModalPortal>
 
       {/* Staff Role Switcher Modal */}
-      {showRoleModal && editingMember && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="change-role-modal">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <ModalPortal isOpen={showRoleModal && !!editingMember} onClose={() => {
+        setShowRoleModal(false);
+        setEditingMember(null);
+      }} id="change-role-modal">
+        {editingMember && (
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto animate-fade-in">
             
             {/* Header */}
             <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-purple-900/40 to-slate-900">
@@ -713,13 +713,16 @@ export default function TeamMembers({ currentMember, setCurrentMember, onMemberU
             </form>
 
           </div>
-        </div>
-      )}
+        )}
+      </ModalPortal>
 
       {/* Delete Member Confirmation Modal */}
-      {showDeleteConfirm && memberToDelete && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="delete-member-modal">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <ModalPortal isOpen={showDeleteConfirm && !!memberToDelete} onClose={() => {
+        setShowDeleteConfirm(false);
+        setMemberToDelete(null);
+      }} id="delete-member-modal">
+        {memberToDelete && (
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto animate-fade-in">
             
             {/* Header */}
             <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-red-900/40 to-slate-900">
@@ -777,8 +780,8 @@ export default function TeamMembers({ currentMember, setCurrentMember, onMemberU
             </form>
 
           </div>
-        </div>
-      )}
+        )}
+      </ModalPortal>
 
     </div>
   );
